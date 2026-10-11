@@ -18,7 +18,11 @@
         });
       } else {
         const raw = localStorage.getItem(STORAGE_KEY);
-        resolve(raw ? JSON.parse(raw) : getDefaultSettings());
+        if (raw) {
+          try { resolve(JSON.parse(raw)); } catch (_) { resolve(getDefaultSettings()); }
+        } else {
+          resolve(getDefaultSettings());
+        }
       }
     });
   }
@@ -246,7 +250,7 @@
       const upBtn = document.createElement("button");
       upBtn.className = "bp-btn bp-btn-up";
       upBtn.draggable = false;
-      upBtn.innerHTML = "&#9650;";
+      upBtn.textContent = "▲";
       upBtn.title = "上に移動";
       upBtn.addEventListener("click", (e) => {
         e.preventDefault();
@@ -258,7 +262,7 @@
       const downBtn = document.createElement("button");
       downBtn.className = "bp-btn bp-btn-down";
       downBtn.draggable = false;
-      downBtn.innerHTML = "&#9660;";
+      downBtn.textContent = "▼";
       downBtn.title = "下に移動";
       downBtn.addEventListener("click", (e) => {
         e.preventDefault();
@@ -533,24 +537,42 @@
   function createSettingsButton(settings) {
     const btn = document.createElement("button");
     btn.className = "bp-settings-btn";
-    btn.innerHTML = "&#9881;";
+    btn.textContent = "⚙";
     btn.title = "ポータルを編集";
 
-    const resetBtn = document.createElement("button");
-    resetBtn.className = "bp-reset-btn";
-    resetBtn.textContent = "設定をリセット";
-    resetBtn.addEventListener("click", () => {
-      if (confirm("すべての設定をリセットしますか？")) {
-        const defaults = getDefaultSettings();
-        Object.assign(settings, defaults);
-        saveSettings(settings);
-        document.body.classList.remove("bp-edit-mode");
-        btn.classList.remove("active");
-        hiddenSectionOpen = false;
-        applyLayout(settings);
-        cleanupTogglableElements(settings);
+    let resetBtn = null;
+
+    function enterEditMode() {
+      document.body.classList.add("bp-edit-mode");
+      btn.classList.add("active");
+
+      resetBtn = document.createElement("button");
+      resetBtn.className = "bp-reset-btn";
+      resetBtn.textContent = "設定をリセット";
+      resetBtn.addEventListener("click", () => {
+        if (confirm("すべての設定をリセットしますか？")) {
+          const defaults = getDefaultSettings();
+          Object.assign(settings, defaults);
+          saveSettings(settings);
+          hiddenSectionOpen = false;
+          exitEditMode();
+          applyLayout(settings);
+        }
+      });
+      document.body.appendChild(resetBtn);
+
+      setupTogglableElements(settings, onUpdate);
+    }
+
+    function exitEditMode() {
+      document.body.classList.remove("bp-edit-mode");
+      btn.classList.remove("active");
+      if (resetBtn) {
+        resetBtn.remove();
+        resetBtn = null;
       }
-    });
+      cleanupTogglableElements(settings);
+    }
 
     const onUpdate = () => {
       applyLayout(settings);
@@ -560,17 +582,14 @@
     };
 
     btn.addEventListener("click", () => {
-      document.body.classList.toggle("bp-edit-mode");
-      btn.classList.toggle("active");
       if (document.body.classList.contains("bp-edit-mode")) {
-        setupTogglableElements(settings, onUpdate);
+        exitEditMode();
       } else {
-        cleanupTogglableElements(settings);
+        enterEditMode();
       }
     });
 
     document.body.appendChild(btn);
-    document.body.appendChild(resetBtn);
   }
 
   async function init() {

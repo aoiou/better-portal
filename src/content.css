@@ -270,12 +270,7 @@ body.bp-edit-mode::after {
   font-size: 12px;
   cursor: pointer;
   box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-  display: none;
   font-weight: bold;
-}
-
-body.bp-edit-mode .bp-reset-btn {
-  display: block;
 }
 
 .bp-reset-btn:hover {
