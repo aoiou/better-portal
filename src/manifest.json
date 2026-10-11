@@ -1,0 +1,40 @@
+{
+  "manifest_version": 3,
+  "name": "Better Portal for Doshisha",
+  "version": "1.0.0",
+  "minimum_chrome_version": "150",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "better-portal@tadashin.me",
+      "strict_min_version": "150.0",
+      "data_collection_permissions": {
+        "required": [
+          "none"
+        ]
+      }
+    }
+  },
+  "description": "同志社大学ポータル画面の項目を自由に並び替え・非表示にする拡張機能。※本拡張機能は非公式であり、同志社大学とは関係ありません。",
+  "permissions": [
+    "storage"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://doshisha.ex-tic.com/idm/user/portal/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "run_at": "document_start"
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

@@ -1,0 +1,308 @@
+/* Better Portal - Content Styles */
+
+/* Hide elements until extension finishes layout to prevent flicker */
+[id^="div-"][class*="col-"],
+nav.navbar,
+.page-title,
+.sub-nav,
+#PortalComment02 {
+  opacity: 0 !important;
+}
+
+body.bp-ready [id^="div-"][class*="col-"],
+body.bp-ready .bp-service-card,
+body.bp-ready nav.navbar,
+body.bp-ready .page-title,
+body.bp-ready .sub-nav,
+body.bp-ready #PortalComment02 {
+  opacity: 1 !important;
+  transition: opacity 0.15s ease;
+}
+
+/* Settings toggle button */
+.bp-settings-btn {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 10000;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  background: #6f2c91;
+  color: #fff;
+  font-size: 22px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, transform 0.2s;
+}
+
+.bp-settings-btn:hover {
+  background: #8a3cb0;
+  transform: scale(1.1);
+}
+
+.bp-settings-btn.active {
+  background: #d9534f;
+}
+
+/* Edit mode overlay on each card */
+.bp-edit-overlay {
+  display: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: 8px;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-direction: column;
+}
+
+body.bp-edit-mode .bp-edit-overlay {
+  display: flex;
+  border: 3px solid #6f2c91;
+}
+
+body.bp-edit-mode .service-thumb-wrap {
+  pointer-events: none;
+}
+
+body.bp-edit-mode .bp-edit-overlay {
+  pointer-events: auto;
+}
+
+.bp-btn {
+  padding: 6px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: bold;
+  color: #fff;
+  transition: opacity 0.2s;
+  min-width: 100px;
+}
+
+.bp-btn:hover {
+  opacity: 0.85;
+}
+
+.bp-btn-hide {
+  background: #d9534f;
+}
+
+.bp-btn-show {
+  background: #5cb85c;
+}
+
+.bp-btn-up, .bp-btn-down {
+  background: #337ab7;
+  min-width: 40px !important;
+  padding: 4px 10px !important;
+  font-size: 16px !important;
+}
+
+.bp-move-row {
+  display: flex;
+  gap: 6px;
+}
+
+/* Hidden items section */
+.bp-hidden-section {
+  margin-top: 1.5em;
+  margin-bottom: 2em;
+  border: 2px dashed #ccc;
+  border-radius: 8px;
+  padding: 0;
+  background: #f9f9f9;
+}
+
+.bp-hidden-header {
+  cursor: pointer;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  user-select: none;
+  background: #eee;
+  border-radius: 6px;
+}
+
+.bp-hidden-header:hover {
+  background: #e0e0e0;
+}
+
+.bp-hidden-title {
+  font-size: 15px;
+  font-weight: bold;
+  color: #666;
+}
+
+.bp-hidden-arrow {
+  font-size: 18px;
+  color: #666;
+  transition: transform 0.2s;
+}
+
+.bp-hidden-section.open .bp-hidden-arrow {
+  transform: rotate(180deg);
+}
+
+.bp-hidden-body {
+  display: none !important;
+  padding: 10px 5px;
+}
+
+.bp-hidden-section.open .bp-hidden-body {
+  display: flex !important;
+  flex-wrap: wrap;
+}
+
+.bp-hidden-body .bp-hidden-item {
+  opacity: 0.5;
+  transition: opacity 0.2s;
+}
+
+.bp-hidden-body .bp-hidden-item:hover {
+  opacity: 0.8;
+}
+
+/* Draggable cards in edit mode */
+body.bp-edit-mode .bp-service-card[draggable="true"] {
+  cursor: grab;
+}
+
+body.bp-edit-mode .bp-service-card[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+/* Dragging state */
+body.bp-edit-mode .bp-dragging {
+  opacity: 0.3;
+}
+
+/* Drop indicators */
+.bp-drop-before {
+  position: relative;
+}
+
+.bp-drop-before::before {
+  content: '';
+  position: absolute;
+  left: -2px;
+  top: 5%;
+  bottom: 5%;
+  width: 4px;
+  background: #6f2c91;
+  border-radius: 2px;
+  z-index: 200;
+  box-shadow: 0 0 8px rgba(111, 44, 145, 0.6);
+}
+
+.bp-drop-after {
+  position: relative;
+}
+
+.bp-drop-after::after {
+  content: '';
+  position: absolute;
+  right: -2px;
+  top: 5%;
+  bottom: 5%;
+  width: 4px;
+  background: #6f2c91;
+  border-radius: 2px;
+  z-index: 200;
+  box-shadow: 0 0 8px rgba(111, 44, 145, 0.6);
+}
+
+/* Badge showing hidden count */
+.bp-hidden-count {
+  background: #d9534f;
+  color: #fff;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  margin-left: 8px;
+}
+
+/* Smooth transitions for reorder */
+.bp-service-card {
+  transition: none;
+}
+
+/* Edit mode indicator */
+body.bp-edit-mode::after {
+  content: '編集モード — 項目の表示/非表示の切り替え、ドラッグ&ドロップまたはボタンで並び替えができます';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: #6f2c91;
+  color: #fff;
+  text-align: center;
+  padding: 8px;
+  font-size: 14px;
+  font-weight: bold;
+  z-index: 10001;
+}
+
+/* Reset button */
+.bp-reset-btn {
+  position: fixed;
+  bottom: 76px;
+  right: 20px;
+  z-index: 10000;
+  padding: 8px 14px;
+  border-radius: 20px;
+  border: none;
+  background: #f0ad4e;
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  display: none;
+  font-weight: bold;
+}
+
+body.bp-edit-mode .bp-reset-btn {
+  display: block;
+}
+
+.bp-reset-btn:hover {
+  background: #ec971f;
+}
+
+/* Toggle overlay for togglable elements */
+.bp-toggle-overlay {
+  display: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: 8px;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-direction: column;
+  pointer-events: auto;
+}
+
+body.bp-edit-mode .bp-toggle-overlay {
+  display: flex;
+  border: 3px solid #6f2c91;
+}
+

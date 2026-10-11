@@ -1,0 +1,56 @@
+name: Release Extension
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          # Releaseの対象となったブランチをチェックアウトする（ detached HEAD を防ぐため）
+          ref: ${{ github.event.release.target_commitish }}
+
+      - name: Extract version from tag
+        id: get_version
+        run: |
+          # タグ名から最初の 'v' を取り除く (例: v1.0.0 -> 1.0.0)
+          TAG_NAME="${{ github.event.release.tag_name }}"
+          VERSION=${TAG_NAME#v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Update manifest.json version
+        run: |
+          # jqを使ってmanifest.jsonのversionを更新し、上書きする
+          jq --arg version "${{ steps.get_version.outputs.version }}" '.version = $version' src/manifest.json > manifest_tmp.json
+          mv manifest_tmp.json src/manifest.json
+          echo "manifest.json のバージョンを ${{ steps.get_version.outputs.version }} に更新しました。"
+
+      - name: Commit and push manifest.json
+        run: |
+          # 変更がある場合はコミットし、対象ブランチへプッシュする
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add src/manifest.json
+          
+          # 差分があればコミットしてプッシュ
+          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: bump version to ${{ steps.get_version.outputs.version }} [skip ci]" && git push origin ${{ github.event.release.target_commitish }})
+
+      - name: Create ZIP archive
+        run: |
+          # Chrome Web Store / Firefox Add-ons で公開するために必要最低限なファイルだけをZIPにまとめる
+          cd src
+          zip -r ../better-portal.zip .
+
+      - name: Upload zip to Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 作成したZIPファイルを対象のリリースのアセットとしてアップロードする
+          gh release upload "${{ github.event.release.tag_name }}" better-portal.zip
