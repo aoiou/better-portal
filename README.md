@@ -4,7 +4,7 @@
 
 | Chrome (Chromium系ブラウザ) | Firefox (Firefox系ブラウザ) |
 | :---: | :---: |
-| ![Chrome](publish/assets/Chrome/screenshot-1.jpg) | ![Firefox](publish/assets/Firefox/screenshot-1.jpg) |
+| ![Chrome](publish/assets/Chrome/screenshot-3.jpg) | ![Firefox](publish/assets/Firefox/screenshot-4.jpg) |
 | 👉 Chrome ウェブストアからインストール（公開準備中） | 👉 Firefox ADD-ONS からインストール（公開準備中） |
 
 ---

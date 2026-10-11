@@ -26,7 +26,7 @@
 
 ## Select up to 3 categories for this add-on:
 
-- [x] 外観のカスタマイズ
+- [x] アピアランス
 
 ## ライセンス
 
