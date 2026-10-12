@@ -49,8 +49,9 @@ body.bp-ready #PortalComment02 {
   background: #d9534f;
 }
 
-/* Edit mode overlay on each card */
-.bp-edit-overlay {
+/* Edit mode overlays (cards + togglable elements) */
+.bp-edit-overlay,
+.bp-toggle-overlay {
   display: none;
   position: absolute;
   top: 0;
@@ -67,17 +68,15 @@ body.bp-ready #PortalComment02 {
   flex-direction: column;
 }
 
-body.bp-edit-mode .bp-edit-overlay {
+body.bp-edit-mode .bp-edit-overlay,
+body.bp-edit-mode .bp-toggle-overlay {
   display: flex;
   border: 3px solid #6f2c91;
+  pointer-events: auto;
 }
 
 body.bp-edit-mode .service-thumb-wrap {
   pointer-events: none;
-}
-
-body.bp-edit-mode .bp-edit-overlay {
-  pointer-events: auto;
 }
 
 .bp-btn {
@@ -235,7 +234,6 @@ body.bp-edit-mode .bp-dragging {
   margin-left: 8px;
 }
 
-/* Smooth transitions for reorder */
 .bp-service-card {
   transition: none;
 }
@@ -275,29 +273,5 @@ body.bp-edit-mode::after {
 
 .bp-reset-btn:hover {
   background: #ec971f;
-}
-
-/* Toggle overlay for togglable elements */
-.bp-toggle-overlay {
-  display: none;
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 100;
-  background: rgba(0, 0, 0, 0.45);
-  border-radius: 8px;
-  box-sizing: border-box;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  flex-direction: column;
-  pointer-events: auto;
-}
-
-body.bp-edit-mode .bp-toggle-overlay {
-  display: flex;
-  border: 3px solid #6f2c91;
 }
 

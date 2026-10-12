@@ -110,32 +110,7 @@
     }
   }
 
-  function createToggleOverlay(targetEl, label, settingKey, settings, onUpdate) {
-    let wrapper = targetEl.querySelector(".bp-toggle-overlay");
-    if (wrapper) wrapper.remove();
-
-    wrapper = document.createElement("div");
-    wrapper.className = "bp-toggle-overlay";
-
-    const isHidden = settings[settingKey];
-
-    const btn = document.createElement("button");
-    btn.className = "bp-btn " + (isHidden ? "bp-btn-show" : "bp-btn-hide");
-    btn.textContent = isHidden ? label + " を表示する" : label + " を非表示にする";
-    btn.addEventListener("click", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      settings[settingKey] = !settings[settingKey];
-      saveSettings(settings);
-      onUpdate();
-    });
-
-    wrapper.appendChild(btn);
-    targetEl.style.position = "relative";
-    targetEl.appendChild(wrapper);
-  }
-
-  function createOptionOverlay(targetEl, label, settingKey, settings, onUpdate) {
+  function createOverlay(targetEl, settingKey, settings, onUpdate, activeLabel, inactiveLabel) {
     let wrapper = targetEl.querySelector(".bp-toggle-overlay");
     if (wrapper) wrapper.remove();
 
@@ -146,7 +121,7 @@
 
     const btn = document.createElement("button");
     btn.className = "bp-btn " + (isActive ? "bp-btn-show" : "bp-btn-hide");
-    btn.textContent = isActive ? label + " を元に戻す" : label;
+    btn.textContent = isActive ? activeLabel : inactiveLabel;
     btn.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -169,19 +144,19 @@
 
     if (navbar) {
       if (settings.hideNavbar) navbar.style.display = "";
-      createToggleOverlay(navbar, "ナビバー", "hideNavbar", settings, onUpdate);
+      createOverlay(navbar, "hideNavbar", settings, onUpdate, "ナビバー を表示する", "ナビバー を非表示にする");
     }
     if (subNav) {
       if (settings.hideSubNav) subNav.style.display = "";
-      createToggleOverlay(subNav, "サブナビ", "hideSubNav", settings, onUpdate);
+      createOverlay(subNav, "hideSubNav", settings, onUpdate, "サブナビ を表示する", "サブナビ を非表示にする");
     }
     if (pageTitle) {
       if (settings.hidePageTitle) pageTitle.style.display = "";
-      createToggleOverlay(pageTitle, "「アカウント」帯", "hidePageTitle", settings, onUpdate);
+      createOverlay(pageTitle, "hidePageTitle", settings, onUpdate, "「アカウント」帯 を表示する", "「アカウント」帯 を非表示にする");
     }
     if (searchBar) {
       if (settings.hideSearchBar) searchBar.style.display = "";
-      createToggleOverlay(searchBar, "検索欄", "hideSearchBar", settings, onUpdate);
+      createOverlay(searchBar, "hideSearchBar", settings, onUpdate, "検索欄 を表示する", "検索欄 を非表示にする");
     }
     if (notice) {
       if (settings.noticeToBottom) {
@@ -190,7 +165,7 @@
           noticeOriginalParent.insertBefore(notice, noticeOriginalNext);
         }
       }
-      createOptionOverlay(notice, "お知らせを一番下に移動", "noticeToBottom", settings, onUpdate);
+      createOverlay(notice, "noticeToBottom", settings, onUpdate, "お知らせを一番下に移動 を元に戻す", "お知らせを一番下に移動");
     }
   }
 
@@ -209,7 +184,7 @@
     return null;
   }
 
-  function createEditOverlay(card, settings, onUpdate, isVisible) {
+  function createEditOverlay(card, settings, onUpdate) {
     const overlay = document.createElement("div");
     overlay.className = "bp-edit-overlay";
 
@@ -294,10 +269,9 @@
     if (newVisibleIdx < 0 || newVisibleIdx >= visibleOrder.length) return;
 
     const swapId = visibleOrder[newVisibleIdx];
-    const orderIdxA = order.indexOf(cardId);
-    const orderIdxB = order.indexOf(swapId);
-    order[orderIdxA] = swapId;
-    order[orderIdxB] = cardId;
+    const swapIdx = order.indexOf(swapId);
+    order[idx] = swapId;
+    order[swapIdx] = cardId;
 
     settings.order = order;
     saveSettings(settings);
@@ -348,7 +322,6 @@
           return;
         }
         dragState = { cardId: card.id };
-        card.classList.add("bp-dragging");
         e.dataTransfer.effectAllowed = "move";
         e.dataTransfer.setData("text/plain", card.id);
         requestAnimationFrame(() => {
@@ -491,9 +464,7 @@
       card.element.style.display = "";
     }
 
-    while (mainRow.firstChild) {
-      mainRow.removeChild(mainRow.firstChild);
-    }
+    mainRow.replaceChildren();
 
     const { section, body: hiddenBody, countBadge } = createHiddenSection();
 
@@ -510,7 +481,7 @@
       const card = cardMap[id];
       if (!card) continue;
       card.element.classList.add("bp-service-card");
-      const overlay = createEditOverlay(card, settings, onUpdate, true);
+      const overlay = createEditOverlay(card, settings, onUpdate);
       card.element.appendChild(overlay);
       mainRow.appendChild(card.element);
     }
@@ -519,7 +490,7 @@
       const card = cardMap[id];
       if (!card) continue;
       card.element.classList.add("bp-service-card", "bp-hidden-item");
-      const overlay = createEditOverlay(card, settings, onUpdate, false);
+      const overlay = createEditOverlay(card, settings, onUpdate);
       card.element.appendChild(overlay);
       hiddenBody.appendChild(card.element);
     }
