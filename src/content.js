@@ -5,8 +5,6 @@
   let mainRow = null;
   let hiddenSectionOpen = false;
   let draggedCardId = null;
-  let noticeOriginalParent = null;
-  let noticeOriginalNext = null;
 
   const TOGGLE_CONFIG = [
     { key: "hideNavbar", find: () => document.querySelector("nav.navbar"), showLabel: "ナビバー を表示する", hideLabel: "ナビバー を非表示にする" },
@@ -36,13 +34,7 @@
   }
 
   function getAllServiceCards() {
-    const cards = [];
-    for (let i = 1; ; i++) {
-      const el = document.getElementById("div-" + i);
-      if (!el) break;
-      cards.push(el);
-    }
-    return cards;
+    return [...document.querySelectorAll('[id^="div-"][class*="col-"]')];
   }
 
   function createButton(className, text, onClick) {
@@ -58,6 +50,15 @@
     return btn;
   }
 
+  function ensureNoticeAnchor(notice) {
+    if (!document.getElementById("bp-notice-anchor")) {
+      const anchor = document.createElement("span");
+      anchor.id = "bp-notice-anchor";
+      anchor.hidden = true;
+      notice.before(anchor);
+    }
+  }
+
   function applyExtraHides(settings) {
     if (document.body.classList.contains("bp-edit-mode")) return;
 
@@ -68,14 +69,11 @@
 
     const notice = document.getElementById("PortalComment02");
     if (notice) {
-      if (!noticeOriginalParent) {
-        noticeOriginalParent = notice.parentElement;
-        noticeOriginalNext = notice.nextElementSibling;
-      }
+      ensureNoticeAnchor(notice);
       if (settings.noticeToBottom) {
         document.getElementById("div-container")?.appendChild(notice);
-      } else if (noticeOriginalParent) {
-        noticeOriginalParent.insertBefore(notice, noticeOriginalNext);
+      } else {
+        document.getElementById("bp-notice-anchor")?.after(notice);
       }
     }
   }
@@ -111,8 +109,8 @@
 
     const notice = document.getElementById("PortalComment02");
     if (notice) {
-      if (settings.noticeToBottom && noticeOriginalNext) {
-        noticeOriginalParent.insertBefore(notice, noticeOriginalNext);
+      if (settings.noticeToBottom) {
+        document.getElementById("bp-notice-anchor")?.after(notice);
       }
       createOverlay(notice, "noticeToBottom", settings, onUpdate, "お知らせを一番下に移動 を元に戻す", "お知らせを一番下に移動");
     }
@@ -316,11 +314,6 @@
   function applyLayout(settings) {
     const allCards = getAllServiceCards();
     if (!mainRow || allCards.length === 0) return;
-
-    if (settings.order.length === 0) {
-      settings.order = allCards.map((el) => el.id);
-      saveSettings(settings);
-    }
 
     const knownIds = new Set(settings.order);
     for (const el of allCards) {
