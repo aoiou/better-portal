@@ -190,31 +190,15 @@ body.bp-edit-mode .bp-dragging {
 }
 
 /* Drop indicators */
-.bp-drop-before {
-  position: relative;
-}
-
-.bp-drop-before::before {
-  content: '';
-  position: absolute;
-  left: -2px;
-  top: 5%;
-  bottom: 5%;
-  width: 4px;
-  background: #6f2c91;
-  border-radius: 2px;
-  z-index: 200;
-  box-shadow: 0 0 8px rgba(111, 44, 145, 0.6);
-}
-
+.bp-drop-before,
 .bp-drop-after {
   position: relative;
 }
 
+.bp-drop-before::before,
 .bp-drop-after::after {
   content: '';
   position: absolute;
-  right: -2px;
   top: 5%;
   bottom: 5%;
   width: 4px;
@@ -222,6 +206,14 @@ body.bp-edit-mode .bp-dragging {
   border-radius: 2px;
   z-index: 200;
   box-shadow: 0 0 8px rgba(111, 44, 145, 0.6);
+}
+
+.bp-drop-before::before {
+  left: -2px;
+}
+
+.bp-drop-after::after {
+  right: -2px;
 }
 
 /* Badge showing hidden count */

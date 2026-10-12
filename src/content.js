@@ -5,6 +5,15 @@
   let mainRow = null;
   let hiddenSectionOpen = false;
   let dragState = null;
+  let noticeOriginalParent = null;
+  let noticeOriginalNext = null;
+
+  const TOGGLE_CONFIG = [
+    { key: "hideNavbar", find: () => document.querySelector("nav.navbar"), showLabel: "ナビバー を表示する", hideLabel: "ナビバー を非表示にする" },
+    { key: "hideSubNav", find: () => document.querySelector(".sub-nav"), showLabel: "サブナビ を表示する", hideLabel: "サブナビ を非表示にする" },
+    { key: "hidePageTitle", find: () => document.querySelector(".page-title"), showLabel: "「アカウント」帯 を表示する", hideLabel: "「アカウント」帯 を非表示にする" },
+    { key: "hideSearchBar", find: () => { const input = document.getElementById("filterValue"); return input ? input.closest(".row") : null; }, showLabel: "検索欄 を表示する", hideLabel: "検索欄 を非表示にする" },
+  ];
 
   function getDefaultSettings() {
     return { hiddenIds: [], order: [], hideNavbar: false, hidePageTitle: false, hideSearchBar: false, hideSubNav: false, noticeToBottom: false };
@@ -49,53 +58,28 @@
     return cards;
   }
 
-  function findNavbar() {
-    return document.querySelector("nav.navbar");
+  function createButton(className, text, onClick) {
+    const btn = document.createElement("button");
+    btn.className = "bp-btn " + className;
+    btn.draggable = false;
+    btn.textContent = text;
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      onClick();
+    });
+    return btn;
   }
-
-  function findPageTitle() {
-    return document.querySelector(".page-title");
-  }
-
-  function findSearchBar() {
-    const input = document.getElementById("filterValue");
-    if (!input) return null;
-    const row = input.closest(".row");
-    return row;
-  }
-
-  function findSubNav() {
-    return document.querySelector(".sub-nav");
-  }
-
-  function findNotice() {
-    return document.getElementById("PortalComment02");
-  }
-
-  let noticeOriginalParent = null;
-  let noticeOriginalNext = null;
 
   function applyExtraHides(settings) {
     if (document.body.classList.contains("bp-edit-mode")) return;
 
-    const navbar = findNavbar();
-    const pageTitle = findPageTitle();
-    const searchBar = findSearchBar();
-    const subNav = findSubNav();
-    const notice = findNotice();
+    for (const { key, find } of TOGGLE_CONFIG) {
+      const el = find();
+      if (el) el.style.display = settings[key] ? "none" : "";
+    }
 
-    if (navbar) {
-      navbar.style.display = settings.hideNavbar ? "none" : "";
-    }
-    if (pageTitle) {
-      pageTitle.style.display = settings.hidePageTitle ? "none" : "";
-    }
-    if (searchBar) {
-      searchBar.style.display = settings.hideSearchBar ? "none" : "";
-    }
-    if (subNav) {
-      subNav.style.display = settings.hideSubNav ? "none" : "";
-    }
+    const notice = document.getElementById("PortalComment02");
     if (notice) {
       if (!noticeOriginalParent) {
         noticeOriginalParent = notice.parentElement;
@@ -118,52 +102,32 @@
     wrapper.className = "bp-toggle-overlay";
 
     const isActive = settings[settingKey];
+    wrapper.appendChild(createButton(
+      isActive ? "bp-btn-show" : "bp-btn-hide",
+      isActive ? activeLabel : inactiveLabel,
+      () => {
+        settings[settingKey] = !settings[settingKey];
+        saveSettings(settings);
+        onUpdate();
+      }
+    ));
 
-    const btn = document.createElement("button");
-    btn.className = "bp-btn " + (isActive ? "bp-btn-show" : "bp-btn-hide");
-    btn.textContent = isActive ? activeLabel : inactiveLabel;
-    btn.addEventListener("click", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      settings[settingKey] = !settings[settingKey];
-      saveSettings(settings);
-      onUpdate();
-    });
-
-    wrapper.appendChild(btn);
     targetEl.style.position = "relative";
     targetEl.appendChild(wrapper);
   }
 
   function setupTogglableElements(settings, onUpdate) {
-    const navbar = findNavbar();
-    const pageTitle = findPageTitle();
-    const searchBar = findSearchBar();
-    const subNav = findSubNav();
-    const notice = findNotice();
+    for (const { key, find, showLabel, hideLabel } of TOGGLE_CONFIG) {
+      const el = find();
+      if (!el) continue;
+      if (settings[key]) el.style.display = "";
+      createOverlay(el, key, settings, onUpdate, showLabel, hideLabel);
+    }
 
-    if (navbar) {
-      if (settings.hideNavbar) navbar.style.display = "";
-      createOverlay(navbar, "hideNavbar", settings, onUpdate, "ナビバー を表示する", "ナビバー を非表示にする");
-    }
-    if (subNav) {
-      if (settings.hideSubNav) subNav.style.display = "";
-      createOverlay(subNav, "hideSubNav", settings, onUpdate, "サブナビ を表示する", "サブナビ を非表示にする");
-    }
-    if (pageTitle) {
-      if (settings.hidePageTitle) pageTitle.style.display = "";
-      createOverlay(pageTitle, "hidePageTitle", settings, onUpdate, "「アカウント」帯 を表示する", "「アカウント」帯 を非表示にする");
-    }
-    if (searchBar) {
-      if (settings.hideSearchBar) searchBar.style.display = "";
-      createOverlay(searchBar, "hideSearchBar", settings, onUpdate, "検索欄 を表示する", "検索欄 を非表示にする");
-    }
+    const notice = document.getElementById("PortalComment02");
     if (notice) {
-      if (settings.noticeToBottom) {
-        const container = document.getElementById("div-container");
-        if (container && noticeOriginalNext) {
-          noticeOriginalParent.insertBefore(notice, noticeOriginalNext);
-        }
+      if (settings.noticeToBottom && noticeOriginalNext) {
+        noticeOriginalParent.insertBefore(notice, noticeOriginalNext);
       }
       createOverlay(notice, "noticeToBottom", settings, onUpdate, "お知らせを一番下に移動 を元に戻す", "お知らせを一番下に移動");
     }
@@ -191,60 +155,32 @@
     const isHidden = settings.hiddenIds.includes(card.id);
 
     if (isHidden) {
-      const showBtn = document.createElement("button");
-      showBtn.className = "bp-btn bp-btn-show";
-      showBtn.draggable = false;
-      showBtn.textContent = "表示する";
-      showBtn.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
+      overlay.appendChild(createButton("bp-btn-show", "表示する", () => {
         settings.hiddenIds = settings.hiddenIds.filter((id) => id !== card.id);
         saveSettings(settings);
         onUpdate();
-      });
-      overlay.appendChild(showBtn);
+      }));
     } else {
-      const hideBtn = document.createElement("button");
-      hideBtn.className = "bp-btn bp-btn-hide";
-      hideBtn.draggable = false;
-      hideBtn.textContent = "非表示にする";
-      hideBtn.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (!settings.hiddenIds.includes(card.id)) {
-          settings.hiddenIds.push(card.id);
-        }
+      overlay.appendChild(createButton("bp-btn-hide", "非表示にする", () => {
+        settings.hiddenIds.push(card.id);
         saveSettings(settings);
         onUpdate();
-      });
-      overlay.appendChild(hideBtn);
+      }));
 
       const moveRow = document.createElement("div");
       moveRow.className = "bp-move-row";
 
-      const upBtn = document.createElement("button");
-      upBtn.className = "bp-btn bp-btn-up";
-      upBtn.draggable = false;
-      upBtn.textContent = "▲";
-      upBtn.title = "上に移動";
-      upBtn.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
+      const upBtn = createButton("bp-btn-up", "▲", () => {
         moveCard(card.id, -1, settings);
         onUpdate();
       });
+      upBtn.title = "上に移動";
 
-      const downBtn = document.createElement("button");
-      downBtn.className = "bp-btn bp-btn-down";
-      downBtn.draggable = false;
-      downBtn.textContent = "▼";
-      downBtn.title = "下に移動";
-      downBtn.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
+      const downBtn = createButton("bp-btn-down", "▼", () => {
         moveCard(card.id, 1, settings);
         onUpdate();
       });
+      downBtn.title = "下に移動";
 
       moveRow.appendChild(upBtn);
       moveRow.appendChild(downBtn);
@@ -513,6 +449,13 @@
 
     let resetBtn = null;
 
+    const onUpdate = () => {
+      applyLayout(settings);
+      if (document.body.classList.contains("bp-edit-mode")) {
+        setupTogglableElements(settings, onUpdate);
+      }
+    };
+
     function enterEditMode() {
       document.body.classList.add("bp-edit-mode");
       btn.classList.add("active");
@@ -544,13 +487,6 @@
       }
       cleanupTogglableElements(settings);
     }
-
-    const onUpdate = () => {
-      applyLayout(settings);
-      if (document.body.classList.contains("bp-edit-mode")) {
-        setupTogglableElements(settings, onUpdate);
-      }
-    };
 
     btn.addEventListener("click", () => {
       if (document.body.classList.contains("bp-edit-mode")) {
