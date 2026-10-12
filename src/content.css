@@ -227,6 +227,7 @@ body.bp-edit-mode .bp-dragging {
 }
 
 .bp-service-card {
+  position: relative;
   transition: none;
 }
 

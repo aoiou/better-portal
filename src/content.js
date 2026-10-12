@@ -50,15 +50,6 @@
     return btn;
   }
 
-  function ensureNoticeAnchor(notice) {
-    if (!document.getElementById("bp-notice-anchor")) {
-      const anchor = document.createElement("span");
-      anchor.id = "bp-notice-anchor";
-      anchor.hidden = true;
-      notice.before(anchor);
-    }
-  }
-
   function applyExtraHides(settings) {
     if (document.body.classList.contains("bp-edit-mode")) return;
 
@@ -69,7 +60,12 @@
 
     const notice = document.getElementById("PortalComment02");
     if (notice) {
-      ensureNoticeAnchor(notice);
+      if (!document.getElementById("bp-notice-anchor")) {
+        const anchor = document.createElement("span");
+        anchor.id = "bp-notice-anchor";
+        anchor.hidden = true;
+        notice.before(anchor);
+      }
       if (settings.noticeToBottom) {
         document.getElementById("div-container")?.appendChild(notice);
       } else {
@@ -270,45 +266,22 @@
     });
   }
 
-  function createHiddenSection() {
+  function createHiddenSection(count) {
     const section = document.createElement("div");
-    section.className = "bp-hidden-section";
-    if (hiddenSectionOpen) section.classList.add("open");
+    section.className = "bp-hidden-section" + (hiddenSectionOpen ? " open" : "");
+    section.innerHTML =
+      '<div class="bp-hidden-header"><span>' +
+      '<span class="bp-hidden-title">非表示の項目</span>' +
+      '<span class="bp-hidden-count">' + count + "</span>" +
+      '</span><span class="bp-hidden-arrow">▼</span></div>' +
+      '<div class="bp-hidden-body"></div>';
 
-    const header = document.createElement("div");
-    header.className = "bp-hidden-header";
-
-    const title = document.createElement("span");
-    title.className = "bp-hidden-title";
-    title.textContent = "非表示の項目";
-
-    const countBadge = document.createElement("span");
-    countBadge.className = "bp-hidden-count";
-    countBadge.textContent = "0";
-
-    const arrow = document.createElement("span");
-    arrow.className = "bp-hidden-arrow";
-    arrow.textContent = "▼";
-
-    const titleWrap = document.createElement("span");
-    titleWrap.appendChild(title);
-    titleWrap.appendChild(countBadge);
-
-    header.appendChild(titleWrap);
-    header.appendChild(arrow);
-
-    header.addEventListener("click", () => {
+    section.firstElementChild.addEventListener("click", () => {
       section.classList.toggle("open");
       hiddenSectionOpen = section.classList.contains("open");
     });
 
-    const body = document.createElement("div");
-    body.className = "bp-hidden-body";
-
-    section.appendChild(header);
-    section.appendChild(body);
-
-    return { section, body, countBadge };
+    return { section, body: section.querySelector(".bp-hidden-body") };
   }
 
   function applyLayout(settings) {
@@ -330,39 +303,31 @@
       el.querySelector(".bp-edit-overlay")?.remove();
       el.classList.remove("bp-hidden-item");
       el.removeAttribute("draggable");
-      el.style.display = "";
     }
 
     mainRow.replaceChildren();
 
-    const { section, body: hiddenBody, countBadge } = createHiddenSection();
-
     const hiddenSet = new Set(settings.hiddenIds);
-    const visibleIds = settings.order.filter((id) => !hiddenSet.has(id));
-    const hiddenIds = settings.order.filter((id) => hiddenSet.has(id));
-
     const onUpdate = () => applyLayout(settings);
 
-    for (const id of visibleIds) {
+    for (const id of settings.order) {
       const el = cardById.get(id);
-      if (!el) continue;
+      if (!el || hiddenSet.has(id)) continue;
       el.classList.add("bp-service-card");
       el.setAttribute("draggable", "true");
       el.appendChild(createEditOverlay(el, settings, onUpdate));
       mainRow.appendChild(el);
     }
 
-    for (const id of hiddenIds) {
-      const el = cardById.get(id);
-      if (!el) continue;
-      el.classList.add("bp-service-card", "bp-hidden-item");
-      el.appendChild(createEditOverlay(el, settings, onUpdate));
-      hiddenBody.appendChild(el);
-    }
-
-    countBadge.textContent = hiddenIds.length;
-
-    if (hiddenIds.length > 0) {
+    const hiddenCards = settings.order.filter((id) => hiddenSet.has(id) && cardById.has(id));
+    if (hiddenCards.length > 0) {
+      const { section, body } = createHiddenSection(hiddenCards.length);
+      for (const id of hiddenCards) {
+        const el = cardById.get(id);
+        el.classList.add("bp-service-card", "bp-hidden-item");
+        el.appendChild(createEditOverlay(el, settings, onUpdate));
+        body.appendChild(el);
+      }
       mainRow.parentElement.appendChild(section);
     }
 
