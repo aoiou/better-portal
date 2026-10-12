@@ -40,7 +40,7 @@
     for (let i = 1; ; i++) {
       const el = document.getElementById("div-" + i);
       if (!el) break;
-      cards.push({ id: "div-" + i, element: el });
+      cards.push(el);
     }
     return cards;
   }
@@ -127,21 +127,22 @@
     return document.querySelector('.row:has([id^="div-"][class*="col-"])');
   }
 
-  function createEditOverlay(card, settings, onUpdate) {
+  function createEditOverlay(el, settings, onUpdate) {
     const overlay = document.createElement("div");
     overlay.className = "bp-edit-overlay";
 
-    const isHidden = settings.hiddenIds.includes(card.id);
+    const id = el.id;
+    const isHidden = settings.hiddenIds.includes(id);
 
     if (isHidden) {
       overlay.appendChild(createButton("bp-btn-show", "表示する", () => {
-        settings.hiddenIds = settings.hiddenIds.filter((id) => id !== card.id);
+        settings.hiddenIds = settings.hiddenIds.filter((hid) => hid !== id);
         saveSettings(settings);
         onUpdate();
       }));
     } else {
       overlay.appendChild(createButton("bp-btn-hide", "非表示にする", () => {
-        settings.hiddenIds.push(card.id);
+        settings.hiddenIds.push(id);
         saveSettings(settings);
         onUpdate();
       }));
@@ -150,13 +151,13 @@
       moveRow.className = "bp-move-row";
 
       const upBtn = createButton("bp-btn-up", "▲", () => {
-        moveCard(card.id, -1, settings);
+        moveCard(id, -1, settings);
         onUpdate();
       });
       upBtn.title = "上に移動";
 
       const downBtn = createButton("bp-btn-down", "▼", () => {
-        moveCard(card.id, 1, settings);
+        moveCard(id, 1, settings);
         onUpdate();
       });
       downBtn.title = "下に移動";
@@ -317,54 +318,53 @@
     if (!mainRow || allCards.length === 0) return;
 
     if (settings.order.length === 0) {
-      settings.order = allCards.map((c) => c.id);
+      settings.order = allCards.map((el) => el.id);
       saveSettings(settings);
     }
 
     const knownIds = new Set(settings.order);
-    for (const card of allCards) {
-      if (!knownIds.has(card.id)) settings.order.push(card.id);
+    for (const el of allCards) {
+      if (!knownIds.has(el.id)) settings.order.push(el.id);
     }
-    settings.order = settings.order.filter((id) =>
-      allCards.some((c) => c.id === id)
-    );
+    const allIds = new Set(allCards.map((el) => el.id));
+    settings.order = settings.order.filter((id) => allIds.has(id));
 
-    const cardMap = {};
-    for (const card of allCards) cardMap[card.id] = card;
+    const cardById = new Map(allCards.map((el) => [el.id, el]));
 
     mainRow.parentElement.querySelector(".bp-hidden-section")?.remove();
 
-    for (const card of allCards) {
-      card.element.querySelector(".bp-edit-overlay")?.remove();
-      card.element.classList.remove("bp-hidden-item");
-      card.element.removeAttribute("draggable");
-      card.element.style.display = "";
+    for (const el of allCards) {
+      el.querySelector(".bp-edit-overlay")?.remove();
+      el.classList.remove("bp-hidden-item");
+      el.removeAttribute("draggable");
+      el.style.display = "";
     }
 
     mainRow.replaceChildren();
 
     const { section, body: hiddenBody, countBadge } = createHiddenSection();
 
-    const visibleIds = settings.order.filter((id) => !settings.hiddenIds.includes(id));
-    const hiddenIds = settings.order.filter((id) => settings.hiddenIds.includes(id));
+    const hiddenSet = new Set(settings.hiddenIds);
+    const visibleIds = settings.order.filter((id) => !hiddenSet.has(id));
+    const hiddenIds = settings.order.filter((id) => hiddenSet.has(id));
 
     const onUpdate = () => applyLayout(settings);
 
     for (const id of visibleIds) {
-      const card = cardMap[id];
-      if (!card) continue;
-      card.element.classList.add("bp-service-card");
-      card.element.setAttribute("draggable", "true");
-      card.element.appendChild(createEditOverlay(card, settings, onUpdate));
-      mainRow.appendChild(card.element);
+      const el = cardById.get(id);
+      if (!el) continue;
+      el.classList.add("bp-service-card");
+      el.setAttribute("draggable", "true");
+      el.appendChild(createEditOverlay(el, settings, onUpdate));
+      mainRow.appendChild(el);
     }
 
     for (const id of hiddenIds) {
-      const card = cardMap[id];
-      if (!card) continue;
-      card.element.classList.add("bp-service-card", "bp-hidden-item");
-      card.element.appendChild(createEditOverlay(card, settings, onUpdate));
-      hiddenBody.appendChild(card.element);
+      const el = cardById.get(id);
+      if (!el) continue;
+      el.classList.add("bp-service-card", "bp-hidden-item");
+      el.appendChild(createEditOverlay(el, settings, onUpdate));
+      hiddenBody.appendChild(el);
     }
 
     countBadge.textContent = hiddenIds.length;
