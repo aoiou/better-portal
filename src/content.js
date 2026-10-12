@@ -11,6 +11,25 @@
     { key: "hideSubNav", find: () => document.querySelector(".sub-nav"), showLabel: "サブナビ を表示する", hideLabel: "サブナビ を非表示にする" },
     { key: "hidePageTitle", find: () => document.querySelector(".page-title"), showLabel: "「アカウント」帯 を表示する", hideLabel: "「アカウント」帯 を非表示にする" },
     { key: "hideSearchBar", find: () => document.getElementById("filterValue")?.closest(".row"), showLabel: "検索欄 を表示する", hideLabel: "検索欄 を非表示にする" },
+    {
+      key: "noticeToBottom",
+      find: () => document.getElementById("PortalComment02"),
+      showLabel: "お知らせを一番下に移動 を元に戻す",
+      hideLabel: "お知らせを一番下に移動",
+      apply(el, active) {
+        if (!document.getElementById("bp-notice-anchor")) {
+          const anchor = document.createElement("span");
+          anchor.id = "bp-notice-anchor";
+          anchor.hidden = true;
+          el.before(anchor);
+        }
+        if (active) document.getElementById("div-container")?.appendChild(el);
+        else document.getElementById("bp-notice-anchor")?.after(el);
+      },
+      revert(el, active) {
+        if (active) document.getElementById("bp-notice-anchor")?.after(el);
+      },
+    },
   ];
 
   const storage = globalThis.browser?.storage?.local ?? globalThis.chrome?.storage?.local;
@@ -52,40 +71,26 @@
 
   function applyExtraHides(settings) {
     if (document.body.classList.contains("bp-edit-mode")) return;
-
-    for (const { key, find } of TOGGLE_CONFIG) {
-      const el = find();
-      if (el) el.style.display = settings[key] ? "none" : "";
-    }
-
-    const notice = document.getElementById("PortalComment02");
-    if (notice) {
-      if (!document.getElementById("bp-notice-anchor")) {
-        const anchor = document.createElement("span");
-        anchor.id = "bp-notice-anchor";
-        anchor.hidden = true;
-        notice.before(anchor);
-      }
-      if (settings.noticeToBottom) {
-        document.getElementById("div-container")?.appendChild(notice);
-      } else {
-        document.getElementById("bp-notice-anchor")?.after(notice);
-      }
+    for (const cfg of TOGGLE_CONFIG) {
+      const el = cfg.find();
+      if (!el) continue;
+      if (cfg.apply) cfg.apply(el, settings[cfg.key]);
+      else el.style.display = settings[cfg.key] ? "none" : "";
     }
   }
 
-  function createOverlay(targetEl, settingKey, settings, onUpdate, activeLabel, inactiveLabel) {
+  function createOverlay(targetEl, cfg, settings, onUpdate) {
     targetEl.querySelector(".bp-toggle-overlay")?.remove();
 
     const wrapper = document.createElement("div");
     wrapper.className = "bp-toggle-overlay";
 
-    const isActive = settings[settingKey];
+    const isActive = settings[cfg.key];
     wrapper.appendChild(createButton(
       isActive ? "bp-btn-show" : "bp-btn-hide",
-      isActive ? activeLabel : inactiveLabel,
+      isActive ? cfg.showLabel : cfg.hideLabel,
       () => {
-        settings[settingKey] = !settings[settingKey];
+        settings[cfg.key] = !settings[cfg.key];
         saveSettings(settings);
         onUpdate();
       }
@@ -96,19 +101,12 @@
   }
 
   function setupTogglableElements(settings, onUpdate) {
-    for (const { key, find, showLabel, hideLabel } of TOGGLE_CONFIG) {
-      const el = find();
+    for (const cfg of TOGGLE_CONFIG) {
+      const el = cfg.find();
       if (!el) continue;
-      if (settings[key]) el.style.display = "";
-      createOverlay(el, key, settings, onUpdate, showLabel, hideLabel);
-    }
-
-    const notice = document.getElementById("PortalComment02");
-    if (notice) {
-      if (settings.noticeToBottom) {
-        document.getElementById("bp-notice-anchor")?.after(notice);
-      }
-      createOverlay(notice, "noticeToBottom", settings, onUpdate, "お知らせを一番下に移動 を元に戻す", "お知らせを一番下に移動");
+      if (cfg.revert) cfg.revert(el, settings[cfg.key]);
+      else if (settings[cfg.key]) el.style.display = "";
+      createOverlay(el, cfg, settings, onUpdate);
     }
   }
 
