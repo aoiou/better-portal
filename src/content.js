@@ -4,7 +4,7 @@
   const STORAGE_KEY = "betterPortalSettings";
   let mainRow = null;
   let hiddenSectionOpen = false;
-  let dragState = null;
+  let draggedCardId = null;
   let noticeOriginalParent = null;
   let noticeOriginalNext = null;
 
@@ -12,48 +12,35 @@
     { key: "hideNavbar", find: () => document.querySelector("nav.navbar"), showLabel: "ナビバー を表示する", hideLabel: "ナビバー を非表示にする" },
     { key: "hideSubNav", find: () => document.querySelector(".sub-nav"), showLabel: "サブナビ を表示する", hideLabel: "サブナビ を非表示にする" },
     { key: "hidePageTitle", find: () => document.querySelector(".page-title"), showLabel: "「アカウント」帯 を表示する", hideLabel: "「アカウント」帯 を非表示にする" },
-    { key: "hideSearchBar", find: () => { const input = document.getElementById("filterValue"); return input ? input.closest(".row") : null; }, showLabel: "検索欄 を表示する", hideLabel: "検索欄 を非表示にする" },
+    { key: "hideSearchBar", find: () => document.getElementById("filterValue")?.closest(".row"), showLabel: "検索欄 を表示する", hideLabel: "検索欄 を非表示にする" },
   ];
+
+  const storage = globalThis.browser?.storage?.local ?? globalThis.chrome?.storage?.local;
 
   function getDefaultSettings() {
     return { hiddenIds: [], order: [], hideNavbar: false, hidePageTitle: false, hideSearchBar: false, hideSubNav: false, noticeToBottom: false };
   }
 
-  function loadSettings() {
-    return new Promise((resolve) => {
-      if (typeof browser !== "undefined" && browser.storage && browser.storage.local) {
-        browser.storage.local.get(STORAGE_KEY, (result) => {
-          resolve(result[STORAGE_KEY] || getDefaultSettings());
-        });
-      } else {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (raw) {
-          try { resolve(JSON.parse(raw)); } catch (_) { resolve(getDefaultSettings()); }
-        } else {
-          resolve(getDefaultSettings());
-        }
-      }
-    });
+  async function loadSettings() {
+    if (!storage) return getDefaultSettings();
+    try {
+      const result = await storage.get(STORAGE_KEY);
+      return result[STORAGE_KEY] || getDefaultSettings();
+    } catch {
+      return getDefaultSettings();
+    }
   }
 
   function saveSettings(settings) {
-    if (typeof browser !== "undefined" && browser.storage && browser.storage.local) {
-      browser.storage.local.set({ [STORAGE_KEY]: settings });
-    } else {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-    }
+    storage?.set({ [STORAGE_KEY]: settings });
   }
 
   function getAllServiceCards() {
     const cards = [];
-    let i = 1;
-    while (true) {
+    for (let i = 1; ; i++) {
       const el = document.getElementById("div-" + i);
       if (!el) break;
-      const spanEl = document.getElementById("span-" + i);
-      const name = spanEl ? spanEl.textContent.trim() : "Service " + i;
-      cards.push({ id: "div-" + i, index: i, name: name, element: el });
-      i++;
+      cards.push({ id: "div-" + i, element: el });
     }
     return cards;
   }
@@ -86,8 +73,7 @@
         noticeOriginalNext = notice.nextElementSibling;
       }
       if (settings.noticeToBottom) {
-        const container = document.getElementById("div-container");
-        if (container) container.appendChild(notice);
+        document.getElementById("div-container")?.appendChild(notice);
       } else if (noticeOriginalParent) {
         noticeOriginalParent.insertBefore(notice, noticeOriginalNext);
       }
@@ -95,10 +81,9 @@
   }
 
   function createOverlay(targetEl, settingKey, settings, onUpdate, activeLabel, inactiveLabel) {
-    let wrapper = targetEl.querySelector(".bp-toggle-overlay");
-    if (wrapper) wrapper.remove();
+    targetEl.querySelector(".bp-toggle-overlay")?.remove();
 
-    wrapper = document.createElement("div");
+    const wrapper = document.createElement("div");
     wrapper.className = "bp-toggle-overlay";
 
     const isActive = settings[settingKey];
@@ -139,13 +124,7 @@
   }
 
   function findServiceRow() {
-    const rows = document.querySelectorAll(".row");
-    for (const row of rows) {
-      if (row.querySelector('[id^="div-"][class*="col-"]')) {
-        return row;
-      }
-    }
-    return null;
+    return document.querySelector('.row:has([id^="div-"][class*="col-"])');
   }
 
   function createEditOverlay(card, settings, onUpdate) {
@@ -195,9 +174,7 @@
     const idx = order.indexOf(cardId);
     if (idx < 0) return;
 
-    const visibleOrder = order.filter(
-      (id) => !settings.hiddenIds.includes(id)
-    );
+    const visibleOrder = order.filter((id) => !settings.hiddenIds.includes(id));
     const visibleIdx = visibleOrder.indexOf(cardId);
     if (visibleIdx < 0) return;
 
@@ -223,9 +200,7 @@
     let targetIdx = order.indexOf(targetId);
     if (targetIdx < 0) return;
 
-    if (!insertBefore) {
-      targetIdx++;
-    }
+    if (!insertBefore) targetIdx++;
 
     order.splice(targetIdx, 0, draggedId);
 
@@ -234,96 +209,72 @@
   }
 
   function clearDropIndicators() {
-    if (!mainRow) return;
-    mainRow
-      .querySelectorAll(".bp-drop-before, .bp-drop-after")
-      .forEach((el) => {
-        el.classList.remove("bp-drop-before", "bp-drop-after");
-      });
+    mainRow?.querySelectorAll(".bp-drop-before, .bp-drop-after")
+      .forEach((el) => el.classList.remove("bp-drop-before", "bp-drop-after"));
   }
 
-  function setupDragAndDrop(settings) {
-    if (!mainRow) return;
-
-    const visibleCards = Array.from(
-      mainRow.querySelectorAll(".bp-service-card")
-    );
-
-    for (const card of visibleCards) {
-      card.setAttribute("draggable", "true");
-
-      card.addEventListener("dragstart", (e) => {
-        if (!document.body.classList.contains("bp-edit-mode")) {
-          e.preventDefault();
-          return;
-        }
-        dragState = { cardId: card.id };
-        e.dataTransfer.effectAllowed = "move";
-        e.dataTransfer.setData("text/plain", card.id);
-        requestAnimationFrame(() => {
-          card.classList.add("bp-dragging");
-        });
-      });
-
-      card.addEventListener("dragend", () => {
-        card.classList.remove("bp-dragging");
-        clearDropIndicators();
-        dragState = null;
-      });
-
-      card.addEventListener("dragover", (e) => {
-        if (!dragState || dragState.cardId === card.id) return;
+  function initDragAndDrop(settings) {
+    mainRow.addEventListener("dragstart", (e) => {
+      const card = e.target.closest(".bp-service-card");
+      if (!card || !document.body.classList.contains("bp-edit-mode")) {
         e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
+        return;
+      }
+      draggedCardId = card.id;
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", card.id);
+      requestAnimationFrame(() => card.classList.add("bp-dragging"));
+    });
 
-        clearDropIndicators();
-
-        const rect = card.getBoundingClientRect();
-        const midX = rect.left + rect.width / 2;
-        if (e.clientX < midX) {
-          card.classList.add("bp-drop-before");
-        } else {
-          card.classList.add("bp-drop-after");
-        }
-      });
-
-      card.addEventListener("dragleave", () => {
-        card.classList.remove("bp-drop-before", "bp-drop-after");
-      });
-
-      card.addEventListener("drop", (e) => {
-        e.preventDefault();
-        if (!dragState || dragState.cardId === card.id) return;
-
-        const rect = card.getBoundingClientRect();
-        const midX = rect.left + rect.width / 2;
-        const insertBefore = e.clientX < midX;
-
-        reorderByDrag(dragState.cardId, card.id, insertBefore, settings);
-        clearDropIndicators();
-        dragState = null;
-        applyLayout(settings);
-      });
-    }
+    mainRow.addEventListener("dragend", (e) => {
+      const card = e.target.closest(".bp-service-card");
+      if (card) card.classList.remove("bp-dragging");
+      clearDropIndicators();
+      draggedCardId = null;
+    });
 
     mainRow.addEventListener("dragover", (e) => {
-      if (!dragState) return;
+      if (!draggedCardId) return;
       e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+
+      const card = e.target.closest(".bp-service-card");
+      if (!card || draggedCardId === card.id) return;
+
+      clearDropIndicators();
+      const rect = card.getBoundingClientRect();
+      const midX = rect.left + rect.width / 2;
+      card.classList.add(e.clientX < midX ? "bp-drop-before" : "bp-drop-after");
+    });
+
+    mainRow.addEventListener("dragleave", (e) => {
+      const card = e.target.closest(".bp-service-card");
+      if (card) card.classList.remove("bp-drop-before", "bp-drop-after");
     });
 
     mainRow.addEventListener("drop", (e) => {
-      if (!dragState) return;
+      if (!draggedCardId) return;
       e.preventDefault();
+
+      const card = e.target.closest(".bp-service-card");
+      const shouldReorder = card && draggedCardId !== card.id;
+
+      if (shouldReorder) {
+        const rect = card.getBoundingClientRect();
+        const midX = rect.left + rect.width / 2;
+        reorderByDrag(draggedCardId, card.id, e.clientX < midX, settings);
+      }
+
       clearDropIndicators();
+      draggedCardId = null;
+      if (shouldReorder) applyLayout(settings);
     });
   }
 
   function createHiddenSection() {
     const section = document.createElement("div");
     section.className = "bp-hidden-section";
-    if (hiddenSectionOpen) {
-      section.classList.add("open");
-    }
+    if (hiddenSectionOpen) section.classList.add("open");
 
     const header = document.createElement("div");
     header.className = "bp-hidden-header";
@@ -372,29 +323,19 @@
 
     const knownIds = new Set(settings.order);
     for (const card of allCards) {
-      if (!knownIds.has(card.id)) {
-        settings.order.push(card.id);
-      }
+      if (!knownIds.has(card.id)) settings.order.push(card.id);
     }
     settings.order = settings.order.filter((id) =>
       allCards.some((c) => c.id === id)
     );
 
     const cardMap = {};
-    for (const card of allCards) {
-      cardMap[card.id] = card;
-    }
+    for (const card of allCards) cardMap[card.id] = card;
 
-    const existingHiddenSection = mainRow.parentElement.querySelector(
-      ".bp-hidden-section"
-    );
-    if (existingHiddenSection) {
-      existingHiddenSection.remove();
-    }
+    mainRow.parentElement.querySelector(".bp-hidden-section")?.remove();
 
     for (const card of allCards) {
-      const existingOverlay = card.element.querySelector(".bp-edit-overlay");
-      if (existingOverlay) existingOverlay.remove();
+      card.element.querySelector(".bp-edit-overlay")?.remove();
       card.element.classList.remove("bp-hidden-item");
       card.element.removeAttribute("draggable");
       card.element.style.display = "";
@@ -404,12 +345,8 @@
 
     const { section, body: hiddenBody, countBadge } = createHiddenSection();
 
-    const visibleIds = settings.order.filter(
-      (id) => !settings.hiddenIds.includes(id)
-    );
-    const hiddenIds = settings.order.filter((id) =>
-      settings.hiddenIds.includes(id)
-    );
+    const visibleIds = settings.order.filter((id) => !settings.hiddenIds.includes(id));
+    const hiddenIds = settings.order.filter((id) => settings.hiddenIds.includes(id));
 
     const onUpdate = () => applyLayout(settings);
 
@@ -417,8 +354,8 @@
       const card = cardMap[id];
       if (!card) continue;
       card.element.classList.add("bp-service-card");
-      const overlay = createEditOverlay(card, settings, onUpdate);
-      card.element.appendChild(overlay);
+      card.element.setAttribute("draggable", "true");
+      card.element.appendChild(createEditOverlay(card, settings, onUpdate));
       mainRow.appendChild(card.element);
     }
 
@@ -426,8 +363,7 @@
       const card = cardMap[id];
       if (!card) continue;
       card.element.classList.add("bp-service-card", "bp-hidden-item");
-      const overlay = createEditOverlay(card, settings, onUpdate);
-      card.element.appendChild(overlay);
+      card.element.appendChild(createEditOverlay(card, settings, onUpdate));
       hiddenBody.appendChild(card.element);
     }
 
@@ -437,7 +373,6 @@
       mainRow.parentElement.appendChild(section);
     }
 
-    setupDragAndDrop(settings);
     applyExtraHides(settings);
   }
 
@@ -465,8 +400,7 @@
       resetBtn.textContent = "設定をリセット";
       resetBtn.addEventListener("click", () => {
         if (confirm("すべての設定をリセットしますか？")) {
-          const defaults = getDefaultSettings();
-          Object.assign(settings, defaults);
+          Object.assign(settings, getDefaultSettings());
           saveSettings(settings);
           hiddenSectionOpen = false;
           exitEditMode();
@@ -504,6 +438,7 @@
     if (!mainRow) return;
 
     const settings = await loadSettings();
+    initDragAndDrop(settings);
     applyLayout(settings);
     createSettingsButton(settings);
     document.body.classList.add("bp-ready");
