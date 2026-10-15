@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Better Portal for Doshisha",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "minimum_chrome_version": "150",
   "browser_specific_settings": {
     "gecko": {
