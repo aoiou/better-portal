@@ -267,19 +267,30 @@
   function createHiddenSection(count) {
     const section = document.createElement("div");
     section.className = "bp-hidden-section" + (hiddenSectionOpen ? " open" : "");
-    section.innerHTML =
-      '<div class="bp-hidden-header"><span>' +
-      '<span class="bp-hidden-title">非表示の項目</span>' +
-      '<span class="bp-hidden-count">' + count + "</span>" +
-      '</span><span class="bp-hidden-arrow">▼</span></div>' +
-      '<div class="bp-hidden-body"></div>';
+    const makeEl = (tag, className, text) => {
+      const el = document.createElement(tag);
+      if (className) el.className = className;
+      if (text != null) el.textContent = String(text);
+      return el;
+    };
 
-    section.firstElementChild.addEventListener("click", () => {
+    const header = makeEl("div", "bp-hidden-header");
+    const label = makeEl("span");
+    label.append(
+      makeEl("span", "bp-hidden-title", "非表示の項目"),
+      makeEl("span", "bp-hidden-count", count)
+    );
+    header.append(label, makeEl("span", "bp-hidden-arrow", "▼"));
+
+    const body = makeEl("div", "bp-hidden-body");
+    section.append(header, body);
+
+    header.addEventListener("click", () => {
       section.classList.toggle("open");
       hiddenSectionOpen = section.classList.contains("open");
     });
 
-    return { section, body: section.querySelector(".bp-hidden-body") };
+    return { section, body };
   }
 
   function applyLayout(settings) {
