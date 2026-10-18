@@ -80,10 +80,13 @@
     if (!originalOnclick) return;
 
     const customUrl = settings.m365RedirectUrl?.trim();
-    if (customUrl) {
-      link.setAttribute("onclick", buildM365Onclick(originalOnclick, customUrl));
-    } else {
-      link.setAttribute("onclick", originalOnclick);
+    const targetOnclick = customUrl
+      ? buildM365Onclick(originalOnclick, customUrl)
+      : originalOnclick;
+
+    if (link.getAttribute("onclick") !== targetOnclick) {
+      link.dataset.bpOnclick = targetOnclick;
+      link.dispatchEvent(new CustomEvent("bp-onclick-change", { bubbles: true }));
     }
   }
 

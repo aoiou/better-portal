@@ -24,6 +24,16 @@
         "https://doshisha.ex-tic.com/idm/user/portal/*"
       ],
       "js": [
+        "page.js"
+      ],
+      "world": "MAIN",
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://doshisha.ex-tic.com/idm/user/portal/*"
+      ],
+      "js": [
         "content.js"
       ],
       "css": [
