@@ -35,14 +35,63 @@
   const storage = globalThis.browser?.storage?.local ?? globalThis.chrome?.storage?.local;
 
   function getDefaultSettings() {
-    return { hiddenIds: [], order: [], hideNavbar: false, hidePageTitle: false, hideSearchBar: false, hideSubNav: false, noticeToBottom: false };
+    return {
+      hiddenIds: [],
+      order: [],
+      hideNavbar: false,
+      hidePageTitle: false,
+      hideSearchBar: false,
+      hideSubNav: false,
+      noticeToBottom: false,
+      m365RedirectUrl: "",
+    };
+  }
+
+  function isM365Card(el) {
+    const spanText = el.querySelector("span")?.textContent?.trim();
+    if (spanText === "Microsoft365") return true;
+    const onclick = el.querySelector("a.service-thumb")?.getAttribute("onclick") || "";
+    return onclick.includes("login.microsoftonline.com");
+  }
+
+  function buildM365Onclick(originalOnclick, inputUrl) {
+    let trimmed = inputUrl.trim();
+    if (!trimmed || !originalOnclick) return originalOnclick;
+    if (!/^https?:\/\//i.test(trimmed)) {
+      trimmed = "https://" + trimmed;
+    }
+    if (/^https?:\/\/login\.microsoftonline\.com\//i.test(trimmed) || !/[?&]wreply=/i.test(originalOnclick)) {
+      const escaped = trimmed.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+      return originalOnclick.replace(/https?:\/\/[^'"]+/i, escaped);
+    }
+    return originalOnclick.replace(/([?&]wreply=)[^'&"]+/i, "$1" + encodeURIComponent(trimmed));
+  }
+
+  function applyM365Redirect(el, settings) {
+    if (!isM365Card(el)) return;
+    const link = el.querySelector("a.service-thumb");
+    if (!link) return;
+
+    if (!("bpOriginalOnclick" in link.dataset)) {
+      link.dataset.bpOriginalOnclick = link.getAttribute("onclick") || "";
+    }
+
+    const originalOnclick = link.dataset.bpOriginalOnclick;
+    if (!originalOnclick) return;
+
+    const customUrl = settings.m365RedirectUrl?.trim();
+    if (customUrl) {
+      link.setAttribute("onclick", buildM365Onclick(originalOnclick, customUrl));
+    } else {
+      link.setAttribute("onclick", originalOnclick);
+    }
   }
 
   async function loadSettings() {
     if (!storage) return getDefaultSettings();
     try {
       const result = await storage.get(STORAGE_KEY);
-      return result[STORAGE_KEY] || getDefaultSettings();
+      return { ...getDefaultSettings(), ...result[STORAGE_KEY] };
     } catch {
       return getDefaultSettings();
     }
@@ -157,6 +206,28 @@
       moveRow.appendChild(upBtn);
       moveRow.appendChild(downBtn);
       overlay.appendChild(moveRow);
+
+      if (isM365Card(el)) {
+        const hasCustomUrl = Boolean(settings.m365RedirectUrl?.trim());
+        const linkBtn = createButton(
+          "bp-btn-link",
+          hasCustomUrl ? "リンク先変更 (設定済)" : "リンク先を変更",
+          () => {
+            const input = prompt(
+              "Microsoft365のリダイレクト先URLを入力してください（空欄でデフォルトに戻す）\n例: https://doshishaacjp-my.sharepoint.com/my",
+              settings.m365RedirectUrl || ""
+            );
+            if (input === null) return;
+            settings.m365RedirectUrl = input.trim();
+            saveSettings(settings);
+            onUpdate();
+          }
+        );
+        if (hasCustomUrl) {
+          linkBtn.title = "現在の設定: " + settings.m365RedirectUrl;
+        }
+        overlay.appendChild(linkBtn);
+      }
     }
 
     return overlay;
@@ -312,6 +383,7 @@
       el.querySelector(".bp-edit-overlay")?.remove();
       el.classList.remove("bp-hidden-item");
       el.removeAttribute("draggable");
+      applyM365Redirect(el, settings);
     }
 
     mainRow.replaceChildren();

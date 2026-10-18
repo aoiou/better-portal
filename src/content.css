@@ -103,6 +103,10 @@ body.bp-edit-mode .service-thumb-wrap {
   background: #5cb85c;
 }
 
+.bp-btn-link {
+  background: #f0ad4e;
+}
+
 .bp-btn-up, .bp-btn-down {
   background: #337ab7;
   min-width: 40px !important;
