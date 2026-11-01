@@ -24,6 +24,7 @@ html[data-bp-theme="dark"] body {
   color: #e2e8f0;
 }
 
+html[data-bp-theme="dark"] #wrapper,
 html[data-bp-theme="dark"] .user-wrap,
 html[data-bp-theme="dark"] .wrapper {
   background-color: #0f172a;
@@ -42,12 +43,12 @@ html[data-bp-theme="dark"] h2 {
   color: #7dd3fc !important;
 }
 
-html[data-bp-theme="dark"] footer:not(.sessions footer) {
+html[data-bp-theme="dark"] footer:not(.sessions footer):not(.second_factors footer):not(.imgmtxes footer) {
   background-color: #0b1326 !important;
   border-top: 1px solid #1e293b;
 }
 
-html[data-bp-theme="dark"] footer:not(.sessions footer) p {
+html[data-bp-theme="dark"] footer:not(.sessions footer):not(.second_factors footer):not(.imgmtxes footer) p {
   color: #64748b !important;
 }
 
@@ -134,11 +135,15 @@ html[data-bp-theme="dark"] .btn-info:disabled {
 /* =====================================================================
  * 1. ログイン・認証画面 (/auth/*)
  * ===================================================================== */
-html[data-bp-theme="dark"] body.sessions {
+html[data-bp-theme="dark"] body.sessions,
+html[data-bp-theme="dark"] body.second_factors,
+html[data-bp-theme="dark"] body.imgmtxes {
   background: #0b1326;
 }
 
-html[data-bp-theme="dark"] .sessions #wrapper {
+html[data-bp-theme="dark"] .sessions #wrapper,
+html[data-bp-theme="dark"] .second_factors #wrapper,
+html[data-bp-theme="dark"] .imgmtxes #wrapper {
   background-color: transparent;
 }
 
@@ -187,17 +192,23 @@ html[data-bp-theme="dark"] .alert-info-icon:before {
   opacity: 0.6;
 }
 
-html[data-bp-theme="dark"] .login div.message {
+html[data-bp-theme="dark"] .login div.message,
+html[data-bp-theme="dark"] #users div.message,
+html[data-bp-theme="dark"] #admins div.message {
   background-color: #1e293b;
   color: #f8fafc;
   border-color: #475569;
 }
 
-html[data-bp-theme="dark"] .login div.message:after {
+html[data-bp-theme="dark"] .login div.message:after,
+html[data-bp-theme="dark"] #users div.message:after,
+html[data-bp-theme="dark"] #admins div.message:after {
   border-top-color: #1e293b;
 }
 
-html[data-bp-theme="dark"] .login div.warning {
+html[data-bp-theme="dark"] .login div.warning,
+html[data-bp-theme="dark"] #users div.warning,
+html[data-bp-theme="dark"] #admins div.warning {
   background-color: rgba(245, 158, 11, 0.14);
   color: #fcd34d;
   border-color: rgba(245, 158, 11, 0.5);
@@ -281,12 +292,26 @@ html[data-bp-theme="dark"] .sub-nav > .sub-nav-inner > a.active:after {
   border-bottom-color: #0f172a !important;
 }
 
-/* お知らせカード・汎用カード */
+/* お知らせカード・汎用カード・SAMLリダイレクト待機カード */
 html[data-bp-theme="dark"] .card,
-html[data-bp-theme="dark"] .card.bg-info-light {
+html[data-bp-theme="dark"] .card.bg-info-light,
+html[data-bp-theme="dark"] .card.border-wating {
   background-color: #1e293b !important;
   border-color: #334155 !important;
   color: #e2e8f0;
+}
+
+html[data-bp-theme="dark"] .status-code4,
+html[data-bp-theme="dark"] .status-code5,
+html[data-bp-theme="dark"] .status-mainte {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  color: #e2e8f0 !important;
+}
+
+html[data-bp-theme="dark"] .status-code5 p.error-code {
+  background-color: #334155 !important;
+  color: #f8fafc !important;
 }
 
 html[data-bp-theme="dark"] .card-header,
@@ -395,10 +420,15 @@ html[data-bp-theme="dark"] .table {
 }
 
 html[data-bp-theme="dark"] .table th,
-html[data-bp-theme="dark"] .table td {
+html[data-bp-theme="dark"] .table td,
+html[data-bp-theme="dark"] .table-row-normal {
   background-color: transparent;
   border-color: #334155;
   color: #e2e8f0;
+}
+
+html[data-bp-theme="dark"] .sticky-table thead th {
+  background-color: #1e293b;
 }
 
 html[data-bp-theme="dark"] .modal-content {
