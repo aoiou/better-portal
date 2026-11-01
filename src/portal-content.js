@@ -32,7 +32,30 @@
     },
   ];
 
-  const storage = globalThis.browser?.storage?.local ?? globalThis.chrome?.storage?.local;
+  async function storageGet(keys) {
+    try {
+      const syncResult = await browser.storage.sync.get(keys);
+      if (syncResult && syncResult[STORAGE_KEY] !== undefined) {
+        return syncResult;
+      }
+      const localResult = await browser.storage.local.get(keys);
+      if (localResult && localResult[STORAGE_KEY] !== undefined) {
+        await browser.storage.sync.set({ [STORAGE_KEY]: localResult[STORAGE_KEY] }).catch(() => {});
+        return localResult;
+      }
+      return syncResult;
+    } catch {
+      return await browser.storage.local.get(keys);
+    }
+  }
+
+  async function storageSet(data) {
+    try {
+      await browser.storage.sync.set(data);
+    } catch {
+      await browser.storage.local.set(data);
+    }
+  }
 
   function getDefaultSettings() {
     return {
@@ -91,9 +114,8 @@
   }
 
   async function loadSettings() {
-    if (!storage) return getDefaultSettings();
     try {
-      const result = await storage.get(STORAGE_KEY);
+      const result = await storageGet(STORAGE_KEY);
       return { ...getDefaultSettings(), ...result[STORAGE_KEY] };
     } catch {
       return getDefaultSettings();
@@ -101,7 +123,7 @@
   }
 
   function saveSettings(settings) {
-    storage?.set({ [STORAGE_KEY]: settings });
+    storageSet({ [STORAGE_KEY]: settings });
   }
 
   function getAllServiceCards() {

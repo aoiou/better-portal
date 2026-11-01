@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Better Portal for Doshisha",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "minimum_chrome_version": "150",
   "browser_specific_settings": {
     "gecko": {
@@ -14,17 +14,55 @@
       }
     }
   },
-  "description": "同志社大学ポータル画面の項目を自由に並び替え・非表示にする拡張機能。※本拡張機能は非公式であり、同志社大学とは関係ありません。",
+  "description": "同志社大学ポータル画面のカスタマイズ（並び替え・非表示）およびログイン・認証の自動化を行う拡張機能。※本拡張機能は非公式であり、同志社大学とは関係ありません。",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    },
+    "default_title": "Better Portal for Doshisha"
+  },
   "permissions": [
     "storage"
   ],
+  "background": {
+    "scripts": [
+      "background.js"
+    ],
+    "service_worker": "background.js"
+  },
+  "commands": {
+    "open-login-page": {
+      "suggested_key": {
+        "default": "Alt+Shift+D",
+        "mac": "Alt+Shift+D"
+      },
+      "description": "同志社ログイン画面を開く"
+    }
+  },
   "content_scripts": [
+    {
+      "matches": [
+        "https://doshisha.ex-tic.com/auth/*"
+      ],
+      "js": [
+        "auth-content.js"
+      ],
+      "run_at": "document_start"
+    },
     {
       "matches": [
         "https://doshisha.ex-tic.com/idm/user/portal/*"
       ],
       "js": [
-        "page.js"
+        "portal-page.js"
       ],
       "world": "MAIN",
       "run_at": "document_start"
@@ -34,17 +72,12 @@
         "https://doshisha.ex-tic.com/idm/user/portal/*"
       ],
       "js": [
-        "content.js"
+        "portal-content.js"
       ],
       "css": [
-        "content.css"
+        "portal-content.css"
       ],
       "run_at": "document_start"
     }
-  ],
-  "icons": {
-    "16": "icons/icon16.png",
-    "48": "icons/icon48.png",
-    "128": "icons/icon128.png"
-  }
+  ]
 }

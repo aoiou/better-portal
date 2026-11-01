@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <!-- SVG スプライト（重複アイコンの一元定義） -->
+  <svg aria-hidden="true" style="display:none">
+    <defs>
+      <symbol id="icon-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"></polyline>
+      </symbol>
+      <symbol id="icon-system" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+        <line x1="8" y1="21" x2="16" y2="21"></line>
+        <line x1="12" y1="17" x2="12" y2="21"></line>
+      </symbol>
+      <symbol id="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="5"></circle>
+        <line x1="12" y1="1" x2="12" y2="3"></line>
+        <line x1="12" y1="21" x2="12" y2="23"></line>
+        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+        <line x1="1" y1="12" x2="3" y2="12"></line>
+        <line x1="21" y1="12" x2="23" y2="12"></line>
+        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+      </symbol>
+      <symbol id="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+      </symbol>
+    </defs>
+  </svg>
+
+  <div class="popup-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="brand">
+        <div class="logo-icon">D</div>
+        <h1 class="title">Better Portal</h1>
+      </div>
+      <div class="header-actions">
+        <a href="https://doshisha.ex-tic.com/auth/session" id="target-domain-link" class="badge" title="ログインページを開く (Alt+Shift+D)" target="_blank" rel="noopener noreferrer">
+          <span>doshisha.ex-tic.com</span>
+          <svg class="external-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+            <polyline points="15 3 21 3 21 9"></polyline>
+            <line x1="10" y1="14" x2="21" y2="3"></line>
+          </svg>
+        </a>
+        <div class="theme-menu-wrapper">
+          <button type="button" id="theme-toggle" class="theme-toggle" title="外観テーマ設定" aria-label="外観テーマ設定" aria-haspopup="true" aria-expanded="false">
+            <svg class="theme-icon system-icon" aria-hidden="true"><use href="#icon-system"></use></svg>
+            <svg class="theme-icon sun-icon" aria-hidden="true"><use href="#icon-sun"></use></svg>
+            <svg class="theme-icon moon-icon" aria-hidden="true"><use href="#icon-moon"></use></svg>
+          </button>
+          <div id="theme-menu" class="theme-menu" role="menu" aria-label="外観テーマの選択" hidden>
+            <button type="button" class="theme-menu-item" data-theme-value="system" role="menuitemradio" aria-checked="false">
+              <svg class="menu-icon" aria-hidden="true"><use href="#icon-system"></use></svg>
+              <div class="menu-item-text">
+                <span class="menu-item-title">システム設定</span>
+                <span class="menu-item-desc">OS設定に連動</span>
+              </div>
+              <svg class="check-icon" aria-hidden="true"><use href="#icon-check"></use></svg>
+            </button>
+            <button type="button" class="theme-menu-item" data-theme-value="light" role="menuitemradio" aria-checked="false">
+              <svg class="menu-icon" aria-hidden="true"><use href="#icon-sun"></use></svg>
+              <div class="menu-item-text">
+                <span class="menu-item-title">ライト</span>
+              </div>
+              <svg class="check-icon" aria-hidden="true"><use href="#icon-check"></use></svg>
+            </button>
+            <button type="button" class="theme-menu-item" data-theme-value="dark" role="menuitemradio" aria-checked="false">
+              <svg class="menu-icon" aria-hidden="true"><use href="#icon-moon"></use></svg>
+              <div class="menu-item-text">
+                <span class="menu-item-title">ダーク</span>
+              </div>
+              <svg class="check-icon" aria-hidden="true"><use href="#icon-check"></use></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <div class="form-group">
+        <label for="username-input" class="form-label">
+          自動入力するユーザー名
+          <span class="required-dot" aria-hidden="true">•</span>
+        </label>
+        <div class="input-wrapper">
+          <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+            <circle cx="12" cy="7" r="4"></circle>
+          </svg>
+          <input
+            type="text"
+            id="username-input"
+            class="form-input"
+            placeholder="ユーザー名を入力"
+            autocomplete="off"
+            spellcheck="false"
+          >
+          <div class="input-actions">
+            <span id="save-indicator" class="save-indicator" title="自動保存完了" aria-label="自動保存完了">
+              <svg aria-hidden="true"><use href="#icon-check"></use></svg>
+            </span>
+            <button type="button" id="clear-btn" class="clear-btn" title="入力をクリア" aria-label="入力をクリア">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <p class="form-hint">
+          ログイン画面を開いた際に「ユーザー名」欄へ自動で入力されます。
+        </p>
+      </div>
+
+      <!-- Options Group -->
+      <div class="options-group">
+        <div class="option-item">
+          <label class="toggle-label" for="auto-submit-toggle">
+            <div class="toggle-text">
+              <span class="option-title">自動で「次へ」に進む</span>
+              <span class="option-desc">入力後に「次へ」ボタンを自動クリック</span>
+            </div>
+            <div class="toggle-switch">
+              <input type="checkbox" id="auto-submit-toggle">
+              <span class="toggle-slider"></span>
+            </div>
+          </label>
+        </div>
+
+        <!-- パスワードレス（FIDO2）設定者向けグループ -->
+        <div class="options-subgroup">
+          <div class="subgroup-header">
+            <div class="subgroup-title-row">
+              <svg class="subgroup-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+              </svg>
+              <span class="subgroup-title">パスワードレス（FIDO2）設定者向け</span>
+            </div>
+            <p class="subgroup-hint">※ アカウントにパスワードレス認証が登録されている場合に適用されます</p>
+          </div>
+
+          <div class="subgroup-items">
+            <div class="option-item">
+              <label class="toggle-label" for="auto-fido2-toggle">
+                <div class="toggle-text">
+                  <span class="option-title">パスワードレス認証を自動開始</span>
+                  <span class="option-desc">画面表示時に「パスワードレス認証」を自動クリック</span>
+                </div>
+                <div class="toggle-switch">
+                  <input type="checkbox" id="auto-fido2-toggle">
+                  <span class="toggle-slider"></span>
+                </div>
+              </label>
+            </div>
+
+            <div class="option-item">
+              <label class="toggle-label" for="auto-password-tab-toggle">
+                <div class="toggle-text">
+                  <span class="option-title">「パスワード」タブを自動選択</span>
+                  <span class="option-desc">FIDO2画面よりパスワード入力を優先して表示</span>
+                </div>
+                <div class="toggle-switch">
+                  <input type="checkbox" id="auto-password-tab-toggle">
+                  <span class="toggle-slider"></span>
+                </div>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <span class="target-link">ポータル編集: 画面右下の <code>⚙</code></span>
+      <span id="version-text"></span>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

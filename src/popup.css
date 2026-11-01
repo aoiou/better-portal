@@ -1,0 +1,696 @@
+:root {
+  --primary: #6366f1;
+  --primary-gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  --primary-glow: rgba(99, 102, 241, 0.25);
+  
+  /* デフォルト: ライトテーマ */
+  --bg-main: #f8fafc;
+  --bg-card: #ffffff;
+  --bg-input: #f8fafc;
+  --bg-header: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  --bg-footer: #f8fafc;
+  --bg-option: #f8fafc;
+  --bg-option-hover: #f1f5f9;
+  --bg-option-active: #eef2ff;
+  --bg-option-active-hover: #e0e7ff;
+  --bg-hover-subtle: rgba(0, 0, 0, 0.05);
+
+  --border-color: #e2e8f0;
+  --border-hover: #cbd5e1;
+  --border-focus: #6366f1;
+  --border-option-active: rgba(99, 102, 241, 0.35);
+  --border-option-active-hover: rgba(99, 102, 241, 0.5);
+
+  --text-main: #0f172a;
+  --text-muted: #475569;
+  --text-hint: #64748b;
+  --text-code: #334155;
+
+  --badge-bg: rgba(99, 102, 241, 0.08);
+  --badge-border: rgba(99, 102, 241, 0.22);
+  --badge-text: #4f46e5;
+
+  --toggle-track: #cbd5e1;
+  --toggle-thumb: #ffffff;
+  --toggle-thumb-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+
+  --shadow-popup: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+  --shadow-menu: 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 6px 12px -4px rgba(0, 0, 0, 0.08);
+
+  --success: #059669;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ダークテーマ変数（popup.js が data-theme を常に resolved 値にセットするため @media 不要） */
+:root[data-theme="dark"] {
+  --bg-main: #0f172a;
+  --bg-card: #1e293b;
+  --bg-input: #0f172a;
+  --bg-header: linear-gradient(180deg, rgba(30, 41, 59, 0.85) 0%, rgba(15, 23, 42, 0.85) 100%);
+  --bg-footer: rgba(15, 23, 42, 0.6);
+  --bg-option: rgba(255, 255, 255, 0.02);
+  --bg-option-hover: rgba(255, 255, 255, 0.04);
+  --bg-option-active: rgba(99, 102, 241, 0.06);
+  --bg-option-active-hover: rgba(99, 102, 241, 0.09);
+  --bg-hover-subtle: rgba(255, 255, 255, 0.08);
+
+  --border-color: #334155;
+  --border-hover: #475569;
+  --border-focus: #818cf8;
+  --border-option-active: rgba(99, 102, 241, 0.3);
+  --border-option-active-hover: rgba(99, 102, 241, 0.45);
+
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --text-hint: #64748b;
+  --text-code: #cbd5e1;
+
+  --badge-bg: rgba(99, 102, 241, 0.15);
+  --badge-border: rgba(99, 102, 241, 0.3);
+  --badge-text: #a5b4fc;
+
+  --toggle-track: #334155;
+  --toggle-thumb: #ffffff;
+  --toggle-thumb-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+
+  --shadow-popup: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+  --shadow-menu: 0 10px 25px -5px rgba(0, 0, 0, 0.45), 0 6px 12px -4px rgba(0, 0, 0, 0.3);
+
+  --success: #10b981;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  width: 320px;
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  font-family: var(--font-family);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow: hidden;
+  user-select: none;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+.popup-container {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-popup);
+  transition: background-color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+/* Header */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  background: var(--bg-header);
+  border-bottom: 1px solid var(--border-color);
+  transition: background 0.25s ease, border-color 0.25s ease;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.logo-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  background: var(--primary-gradient);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 16px;
+  box-shadow: 0 2px 8px var(--primary-glow);
+}
+
+.title {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  color: var(--text-main);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--badge-text);
+  background: var(--badge-bg);
+  border: 1px solid var(--badge-border);
+  padding: 2px 7px;
+  border-radius: 9999px;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.badge:hover {
+  color: var(--text-main);
+  background: var(--badge-border);
+  border-color: var(--primary);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px var(--primary-glow);
+}
+
+.badge:active {
+  transform: translateY(0);
+}
+
+.badge .external-icon {
+  width: 10px;
+  height: 10px;
+  opacity: 0.75;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.badge:hover .external-icon {
+  opacity: 1;
+  transform: translate(0.5px, -0.5px);
+}
+
+.theme-menu-wrapper {
+  position: relative;
+}
+
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: var(--transition);
+  outline: none;
+}
+
+.theme-toggle:hover,
+.theme-toggle[aria-expanded="true"] {
+  color: var(--text-main);
+  background: var(--bg-hover-subtle);
+  border-color: var(--border-hover);
+}
+
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+.theme-toggle .theme-icon {
+  width: 13px;
+  height: 13px;
+  display: none;
+}
+
+/* 設定に応じたボタンアイコンの表示 */
+:root:not([data-theme-setting]) .theme-toggle .system-icon,
+:root[data-theme-setting="system"] .theme-toggle .system-icon {
+  display: block;
+}
+
+:root[data-theme-setting="light"] .theme-toggle .sun-icon {
+  display: block;
+}
+
+:root[data-theme-setting="dark"] .theme-toggle .moon-icon {
+  display: block;
+}
+
+/* テーマドロップダウンメニュー */
+.theme-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 168px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-menu);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 100;
+  animation: themeMenuIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.theme-menu[hidden] {
+  display: none;
+}
+
+@keyframes themeMenuIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.theme-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-main);
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  transition: background-color 0.15s ease, color 0.15s ease;
+  outline: none;
+}
+
+.theme-menu-item:hover,
+.theme-menu-item:focus-visible {
+  background-color: var(--bg-hover-subtle);
+}
+
+.theme-menu-item:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: -2px;
+}
+
+.theme-menu-item.active {
+  color: var(--primary);
+  background-color: var(--bg-option-active);
+}
+
+.theme-menu-item.active:hover,
+.theme-menu-item.active:focus-visible {
+  background-color: var(--bg-option-active-hover);
+}
+
+.theme-menu-item .menu-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: currentColor;
+}
+
+.theme-menu-item .menu-item-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+}
+
+.theme-menu-item .menu-item-title {
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.theme-menu-item .menu-item-desc {
+  font-size: 9.5px;
+  color: var(--text-hint);
+  line-height: 1.2;
+}
+
+.theme-menu-item .check-icon {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  color: var(--primary);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.theme-menu-item.active .check-icon {
+  opacity: 1;
+}
+
+/* Main */
+.main-content {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-label {
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.required-dot {
+  color: var(--primary);
+  margin-left: 4px;
+  font-size: 14px;
+}
+
+.input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-icon {
+  position: absolute;
+  left: 10px;
+  width: 16px;
+  height: 16px;
+  color: var(--text-hint);
+  pointer-events: none;
+  transition: var(--transition);
+}
+
+.form-input {
+  width: 100%;
+  padding: 9px 52px 9px 34px;
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-main);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, background-color 0.2s ease;
+}
+
+.form-input::placeholder {
+  color: var(--text-hint);
+}
+
+.form-input:focus {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px var(--primary-glow);
+}
+
+.input-wrapper:focus-within .input-icon {
+  color: var(--primary);
+}
+
+/* 自動保存完了時の枠線発光ハイライト（:focus より優先） */
+.form-input.is-saved,
+.form-input.is-saved:focus {
+  border-color: var(--success);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.28);
+}
+
+.input-actions {
+  position: absolute;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.save-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  color: var(--success);
+  opacity: 0;
+  transform: scale(0.5);
+  transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: none;
+}
+
+.save-indicator svg {
+  width: 15px;
+  height: 15px;
+}
+
+.save-indicator.visible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.clear-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-hint);
+  cursor: pointer;
+  padding: 3px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  transition: var(--transition);
+}
+
+.clear-btn svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+
+.clear-btn:hover {
+  color: var(--text-main);
+  background: var(--bg-hover-subtle);
+}
+
+.clear-btn.visible {
+  display: inline-flex;
+}
+
+.form-hint {
+  font-size: 11px;
+  color: var(--text-hint);
+  line-height: 1.4;
+}
+
+/* Options */
+.options-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Options Subgroup (パスワードレス設定者向け枠) */
+.options-subgroup {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--badge-bg);
+  border: 1px solid var(--badge-border);
+  border-radius: var(--radius-md);
+  padding: 10px;
+  transition: border-color 0.25s ease, background-color 0.25s ease;
+}
+
+.subgroup-header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 2px;
+}
+
+.subgroup-title-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.subgroup-icon {
+  width: 13px;
+  height: 13px;
+  color: var(--badge-text);
+  flex-shrink: 0;
+}
+
+.subgroup-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--badge-text);
+  letter-spacing: -0.1px;
+}
+
+.subgroup-hint {
+  font-size: 10px;
+  color: var(--text-hint);
+  line-height: 1.35;
+}
+
+.subgroup-items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.options-subgroup .option-item {
+  background: var(--bg-card);
+  padding: 8px 10px;
+}
+
+.option-item {
+  position: relative;
+  background: var(--bg-option);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  transition: background-color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.option-item:hover {
+  background: var(--bg-option-hover);
+  border-color: var(--border-hover);
+}
+
+/* ON状態の洗練されたハイライトスタイル */
+.option-item:has(input:checked) {
+  background: var(--bg-option-active);
+  border-color: var(--border-option-active);
+}
+
+.option-item:has(input:checked):hover {
+  background: var(--bg-option-active-hover);
+  border-color: var(--border-option-active-hover);
+}
+
+/* 切り替え時のさりげない非言語パルス演出（保存完了サイン） */
+.option-item.saved-pulse {
+  animation: optionPulse 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes optionPulse {
+  0% {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-glow);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+.toggle-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  gap: 12px;
+}
+
+.toggle-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.option-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-main);
+  transition: color 0.2s ease;
+}
+
+.option-desc {
+  font-size: 10.5px;
+  color: var(--text-hint);
+  line-height: 1.3;
+}
+
+.toggle-switch {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background-color: var(--toggle-track);
+  transition: background 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s ease;
+  border-radius: 20px;
+}
+
+.toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 3px;
+  bottom: 3px;
+  background-color: var(--toggle-thumb);
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), width 0.15s ease;
+  border-radius: 50%;
+  box-shadow: var(--toggle-thumb-shadow);
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  background: var(--primary-gradient);
+  box-shadow: 0 0 8px var(--primary-glow);
+}
+
+.toggle-switch input:checked + .toggle-slider:before {
+  transform: translateX(16px);
+}
+
+/* 押下時の微細な弾力感（iOS風スプリングフィードバック） */
+.toggle-label:active .toggle-slider:before {
+  width: 19px;
+}
+
+/* Footer */
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background-color: var(--bg-footer);
+  border-top: 1px solid var(--border-color);
+  font-size: 10px;
+  color: var(--text-hint);
+  transition: background-color 0.25s ease, border-color 0.25s ease;
+}
+
+.target-link code {
+  color: var(--text-code);
+}
