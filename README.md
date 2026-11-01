@@ -6,7 +6,7 @@
 | :---: | :---: |
 | ![Chrome Portal](publish/assets/Chrome/screenshot-3.jpg) | ![Firefox Portal](publish/assets/Firefox/screenshot-4.jpg) |
 | ![Chrome Autofill](publish/assets/Chrome/autofill-screenshot-1.jpg) | ![Firefox Autofill](publish/assets/Firefox/autofill-screenshot-3.jpg) |
-| 👉 Chrome ウェブストアからインストール（公開準備中） | 👉 Firefox ADD-ONS からインストール（公開準備中） |
+| [👉 Chrome ウェブストアからインストール](https://chromewebstore.google.com/detail/nlppijonljmbghknljikakdeinkjacmi) | [👉 Firefox ADD-ONS からインストール](https://addons.mozilla.org/en-US/firefox/addon/better-portal-for-doshisha/) |
 
 ---
 
@@ -45,9 +45,15 @@
 
 ## 📦 インストール方法
 
-### 1. 公式ストアからインストール（準備中）
+### 1. 公式ストアからインストール（推奨）
 
-各ストアでの公開が完了次第、リンクよりワンクリックでインストールいただけます。
+- **Google Chrome / Microsoft Edge / Brave 等（Chromium系ブラウザ）**  
+  👉 **[Chrome ウェブストアからインストール](https://chromewebstore.google.com/detail/nlppijonljmbghknljikakdeinkjacmi)**  
+  *※ Edge や Brave などの Chromium 系ブラウザでも、上記リンクからそのまま追加してご利用いただけます。*
+
+- **Mozilla Firefox / Zen / Floorp 等（Firefox系ブラウザ）**  
+  👉 **[Firefox ADD-ONS からインストール](https://addons.mozilla.org/en-US/firefox/addon/better-portal-for-doshisha/)**  
+  *※ Zen や Floorp などの Firefox 系ブラウザでも、上記リンクからそのまま追加してご利用いただけます。*
 
 ---
 
