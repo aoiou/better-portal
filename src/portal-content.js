@@ -127,7 +127,7 @@
   }
 
   function getAllServiceCards() {
-    return [...document.querySelectorAll('[id^="div-"][class*="col-"]')];
+    return [...document.querySelectorAll('[id^="div-"][class*="col-"]:has(.service-thumb-wrap)')];
   }
 
   function createButton(className, text, onClick) {
@@ -190,7 +190,7 @@
   }
 
   function findServiceRow() {
-    return document.querySelector('.row:has([id^="div-"][class*="col-"])');
+    return document.querySelector('.row:has([id^="div-"][class*="col-"] .service-thumb-wrap)');
   }
 
   function createEditOverlay(el, settings, onUpdate) {
@@ -391,50 +391,50 @@
 
   function applyLayout(settings) {
     const allCards = getAllServiceCards();
-    if (!mainRow || allCards.length === 0) return;
-
-    const knownIds = new Set(settings.order);
-    for (const el of allCards) {
-      if (!knownIds.has(el.id)) settings.order.push(el.id);
-    }
-    const allIds = new Set(allCards.map((el) => el.id));
-    settings.order = settings.order.filter((id) => allIds.has(id));
-
-    const cardById = new Map(allCards.map((el) => [el.id, el]));
-
-    mainRow.parentElement.querySelector(".bp-hidden-section")?.remove();
-
-    for (const el of allCards) {
-      el.querySelector(".bp-edit-overlay")?.remove();
-      el.classList.remove("bp-hidden-item");
-      el.removeAttribute("draggable");
-      applyM365Redirect(el, settings);
-    }
-
-    mainRow.replaceChildren();
-
-    const hiddenSet = new Set(settings.hiddenIds);
-    const onUpdate = () => applyLayout(settings);
-
-    for (const id of settings.order) {
-      const el = cardById.get(id);
-      if (!el || hiddenSet.has(id)) continue;
-      el.classList.add("bp-service-card");
-      el.setAttribute("draggable", "true");
-      el.appendChild(createEditOverlay(el, settings, onUpdate));
-      mainRow.appendChild(el);
-    }
-
-    const hiddenCards = settings.order.filter((id) => hiddenSet.has(id) && cardById.has(id));
-    if (hiddenCards.length > 0) {
-      const { section, body } = createHiddenSection(hiddenCards.length);
-      for (const id of hiddenCards) {
-        const el = cardById.get(id);
-        el.classList.add("bp-service-card", "bp-hidden-item");
-        el.appendChild(createEditOverlay(el, settings, onUpdate));
-        body.appendChild(el);
+    if (mainRow && allCards.length > 0) {
+      const knownIds = new Set(settings.order);
+      for (const el of allCards) {
+        if (!knownIds.has(el.id)) settings.order.push(el.id);
       }
-      mainRow.parentElement.appendChild(section);
+      const allIds = new Set(allCards.map((el) => el.id));
+      settings.order = settings.order.filter((id) => allIds.has(id));
+
+      const cardById = new Map(allCards.map((el) => [el.id, el]));
+
+      mainRow.parentElement.querySelector(".bp-hidden-section")?.remove();
+
+      for (const el of allCards) {
+        el.querySelector(".bp-edit-overlay")?.remove();
+        el.classList.remove("bp-hidden-item");
+        el.removeAttribute("draggable");
+        applyM365Redirect(el, settings);
+      }
+
+      mainRow.replaceChildren();
+
+      const hiddenSet = new Set(settings.hiddenIds);
+      const onUpdate = () => applyLayout(settings);
+
+      for (const id of settings.order) {
+        const el = cardById.get(id);
+        if (!el || hiddenSet.has(id)) continue;
+        el.classList.add("bp-service-card");
+        el.setAttribute("draggable", "true");
+        el.appendChild(createEditOverlay(el, settings, onUpdate));
+        mainRow.appendChild(el);
+      }
+
+      const hiddenCards = settings.order.filter((id) => hiddenSet.has(id) && cardById.has(id));
+      if (hiddenCards.length > 0) {
+        const { section, body } = createHiddenSection(hiddenCards.length);
+        for (const id of hiddenCards) {
+          const el = cardById.get(id);
+          el.classList.add("bp-service-card", "bp-hidden-item");
+          el.appendChild(createEditOverlay(el, settings, onUpdate));
+          body.appendChild(el);
+        }
+        mainRow.parentElement.appendChild(section);
+      }
     }
 
     applyExtraHides(settings);
@@ -499,10 +499,16 @@
 
   async function init() {
     mainRow = findServiceRow();
-    if (!mainRow) return;
+    const hasToggleTarget = TOGGLE_CONFIG.some((cfg) => cfg.find());
+    if (!mainRow && !hasToggleTarget) {
+      document.body?.classList.add("bp-ready");
+      return;
+    }
 
     const settings = await loadSettings();
-    initDragAndDrop(settings);
+    if (mainRow) {
+      initDragAndDrop(settings);
+    }
     applyLayout(settings);
     createSettingsButton(settings);
     document.body.classList.add("bp-ready");

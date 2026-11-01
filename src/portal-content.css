@@ -1,7 +1,7 @@
 /* Better Portal - Content Styles */
 
 /* Hide elements until extension finishes layout to prevent flicker */
-[id^="div-"][class*="col-"],
+[id^="div-"][class*="col-"]:has(.service-thumb-wrap),
 nav.navbar,
 .page-title,
 .sub-nav,
@@ -9,7 +9,7 @@ nav.navbar,
   opacity: 0 !important;
 }
 
-body.bp-ready [id^="div-"][class*="col-"],
+body.bp-ready [id^="div-"][class*="col-"]:has(.service-thumb-wrap),
 body.bp-ready .bp-service-card,
 body.bp-ready nav.navbar,
 body.bp-ready .page-title,

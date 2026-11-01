@@ -83,7 +83,7 @@
     },
     {
       "matches": [
-        "https://doshisha.ex-tic.com/idm/user/portal/*"
+        "https://doshisha.ex-tic.com/idm/user/*"
       ],
       "js": [
         "portal-content.js"
