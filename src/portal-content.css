@@ -237,7 +237,7 @@ body.bp-edit-mode .bp-dragging {
 
 /* Edit mode indicator */
 body.bp-edit-mode::after {
-  content: '編集モード — 項目の表示/非表示の切り替え、ドラッグ&ドロップまたはボタンで並び替えができます';
+  content: '編集モード — 項目の表示/非表示の切り替え、並び替え、オリジナルカードの追加ができます';
   position: fixed;
   top: 0;
   left: 0;
@@ -270,5 +270,253 @@ body.bp-edit-mode::after {
 
 .bp-reset-btn:hover {
   background: #ec971f;
+}
+
+/* =====================================================================
+ * オリジナルカード
+ * ===================================================================== */
+
+.bp-btn-edit {
+  background: #337ab7;
+  min-width: 64px !important;
+}
+
+.bp-btn-delete {
+  background: #a94442;
+  min-width: 64px !important;
+}
+
+/* カード内アイコン（絵文字・デフォルト・画像） */
+.bp-custom-icon {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  min-height: 64px;
+  margin: 0 auto;
+  color: #6f2c91;
+  overflow: hidden;
+}
+
+.bp-card-emoji {
+  font-size: 40px;
+  line-height: 1;
+  border: none !important;
+  padding: 0 !important;
+  color: inherit !important;
+}
+
+.bp-card-default-icon {
+  width: 44px;
+  height: 44px;
+}
+
+.bp-card-image {
+  max-width: 100%;
+  max-height: 64px;
+  object-fit: contain;
+}
+
+/* 「＋ 新規カードを追加」枠（編集モード時のみ表示） */
+.bp-add-card-col {
+  display: none !important;
+}
+
+body.bp-edit-mode .bp-add-card-col {
+  display: block !important;
+}
+
+.bp-add-card-btn {
+  width: 100%;
+  height: 100%;
+  min-height: 140px;
+  border: 2px dashed #6f2c91;
+  border-radius: 12px;
+  background: rgba(111, 44, 145, 0.04);
+  color: #6f2c91;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-weight: bold;
+  transition: background 0.2s, transform 0.2s;
+}
+
+.bp-add-card-btn:hover,
+.bp-add-card-btn:focus-visible {
+  background: rgba(111, 44, 145, 0.12);
+  transform: scale(1.02);
+}
+
+.bp-add-card-plus {
+  font-size: 32px;
+  line-height: 1;
+}
+
+.bp-add-card-label {
+  font-size: 14px;
+}
+
+/* 作成・編集モーダル */
+.bp-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10002;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.bp-modal-dialog {
+  width: 100%;
+  max-width: 440px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  background: #fff;
+  color: #333;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
+  border-top: 5px solid #6f2c91;
+  box-sizing: border-box;
+}
+
+.bp-modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px 22px;
+  margin: 0;
+}
+
+.bp-modal-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: bold;
+  color: #6f2c91;
+}
+
+.bp-modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  font-weight: normal;
+}
+
+.bp-modal-label {
+  font-size: 13px;
+  font-weight: bold;
+  color: #555;
+}
+
+.bp-modal-hint {
+  font-size: 12px;
+  color: #888;
+}
+
+.bp-modal-input {
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 14px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  box-sizing: border-box;
+  background: #fff;
+  color: #333;
+}
+
+.bp-modal-input:focus {
+  outline: none;
+  border-color: #6f2c91;
+  box-shadow: 0 0 0 3px rgba(111, 44, 145, 0.2);
+}
+
+.bp-modal-input[hidden] {
+  display: none;
+}
+
+.bp-modal-emoji-input {
+  max-width: 120px;
+  font-size: 20px;
+}
+
+.bp-modal-radio-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.bp-modal-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+  font-weight: normal;
+  margin: 0;
+  cursor: pointer;
+}
+
+.bp-modal-radio input {
+  margin: 0;
+  accent-color: #6f2c91;
+}
+
+.bp-preview-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 160px;
+  margin: 0 auto;
+  padding: 14px 10px 10px;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  background: #fafafa;
+}
+
+.bp-preview-card .bp-custom-icon {
+  width: 100%;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.bp-preview-title {
+  width: 100%;
+  padding-top: 8px;
+  border-top: 1px solid #ddd;
+  text-align: center;
+  font-size: 13px;
+  font-weight: bold;
+  color: #333;
+  overflow-wrap: anywhere;
+}
+
+.bp-modal-error {
+  margin: 0;
+  min-height: 1em;
+  font-size: 13px;
+  color: #d9534f;
+}
+
+.bp-modal-error:empty {
+  display: none;
+}
+
+.bp-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.bp-btn-cancel {
+  background: #888;
+}
+
+.bp-btn-save {
+  background: #6f2c91;
 }
 

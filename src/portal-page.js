@@ -29,5 +29,23 @@
     true
   );
 
+  // オリジナルカードのクリック時、ポータル標準の doPortal(url) で遷移する
+  window.addEventListener(
+    "bp-open-card",
+    (e) => {
+      const link = e.target;
+      if (!(link instanceof Element)) return;
+      const url = link.dataset.bpOpenUrl;
+      delete link.dataset.bpOpenUrl;
+      if (typeof url !== "string" || !/^https?:\/\//i.test(url)) return;
+      if (typeof window.doPortal === "function") {
+        window.doPortal(url);
+      } else {
+        window.open(url, "_blank", "noopener");
+      }
+    },
+    true
+  );
+
   document.querySelectorAll("a[data-bp-onclick]").forEach(applyOnclick);
 })();

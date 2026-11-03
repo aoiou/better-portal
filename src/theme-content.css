@@ -524,3 +524,78 @@ html[data-bp-theme="dark"] input[type="button"]#btnCancel:hover {
   color: #f8fafc;
   border-color: #64748b;
 }
+
+/* =====================================================================
+ * オリジナルカード（追加枠・作成/編集モーダル）
+ * ===================================================================== */
+html[data-bp-theme="dark"] .bp-add-card-btn {
+  border-color: #38bdf8;
+  background: rgba(56, 189, 248, 0.05);
+  color: #7dd3fc;
+}
+
+html[data-bp-theme="dark"] .bp-add-card-btn:hover,
+html[data-bp-theme="dark"] .bp-add-card-btn:focus-visible {
+  background: rgba(56, 189, 248, 0.14);
+}
+
+html[data-bp-theme="dark"] .bp-modal-dialog {
+  background: #1e293b;
+  color: #e2e8f0;
+  border-top-color: #38bdf8;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+}
+
+html[data-bp-theme="dark"] .bp-modal-title {
+  color: #7dd3fc !important;
+}
+
+html[data-bp-theme="dark"] .bp-modal-label {
+  color: #cbd5e1;
+}
+
+html[data-bp-theme="dark"] .bp-modal-hint {
+  color: #94a3b8;
+}
+
+html[data-bp-theme="dark"] .bp-modal-input {
+  background: #0f172a;
+  border-color: #334155;
+  color: #f8fafc;
+}
+
+html[data-bp-theme="dark"] .bp-modal-input::placeholder {
+  color: #64748b;
+}
+
+html[data-bp-theme="dark"] .bp-modal-input:focus {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.25);
+}
+
+html[data-bp-theme="dark"] .bp-modal-radio input {
+  accent-color: #38bdf8;
+}
+
+html[data-bp-theme="dark"] .bp-preview-card {
+  background: #162032;
+  border-color: #334155;
+}
+
+html[data-bp-theme="dark"] .bp-preview-card .bp-custom-icon {
+  background: #ffffff;
+  color: #6f2c91;
+}
+
+html[data-bp-theme="dark"] .bp-preview-title {
+  color: #93c5fd;
+  border-top-color: #334155;
+}
+
+html[data-bp-theme="dark"] .bp-modal-error {
+  color: #f87171;
+}
+
+html[data-bp-theme="dark"] .bp-btn-cancel {
+  background: #475569;
+}
