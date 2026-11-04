@@ -132,6 +132,60 @@ html[data-bp-theme="dark"] .btn-info:disabled {
   opacity: 0.55;
 }
 
+/* アラート通知共通（.alert-success, .alert-info, .alert-warning, .alert-danger） */
+html[data-bp-theme="dark"] .alert-success {
+  background-color: rgba(34, 197, 94, 0.14) !important;
+  border-color: rgba(34, 197, 94, 0.35) !important;
+  color: #86efac !important;
+}
+
+html[data-bp-theme="dark"] .alert-success a,
+html[data-bp-theme="dark"] .alert-success .alert-link {
+  color: #bbf7d0 !important;
+  text-decoration: underline;
+}
+
+html[data-bp-theme="dark"] .alert-info {
+  background-color: rgba(56, 189, 248, 0.12) !important;
+  border-color: rgba(56, 189, 248, 0.35) !important;
+  color: #7dd3fc !important;
+}
+
+html[data-bp-theme="dark"] .alert-info a,
+html[data-bp-theme="dark"] .alert-info .alert-link {
+  color: #bae6fd !important;
+  text-decoration: underline;
+}
+
+html[data-bp-theme="dark"] .alert-warning {
+  background-color: rgba(245, 158, 11, 0.14) !important;
+  border-color: rgba(245, 158, 11, 0.4) !important;
+  color: #fcd34d !important;
+}
+
+html[data-bp-theme="dark"] .alert-warning a,
+html[data-bp-theme="dark"] .alert-warning .alert-link {
+  color: #fde68a !important;
+  text-decoration: underline;
+}
+
+html[data-bp-theme="dark"] .alert-danger {
+  background-color: rgba(239, 68, 68, 0.14) !important;
+  border-color: rgba(239, 68, 68, 0.4) !important;
+  color: #fca5a5 !important;
+}
+
+html[data-bp-theme="dark"] .alert-danger a,
+html[data-bp-theme="dark"] .alert-danger .alert-link {
+  color: #fecaca !important;
+  text-decoration: underline;
+}
+
+html[data-bp-theme="dark"] .alert hr {
+  border-top-color: inherit !important;
+  opacity: 0.25;
+}
+
 /* =====================================================================
  * 1. ログイン・認証画面 (/auth/*)
  * ===================================================================== */
@@ -177,14 +231,8 @@ html[data-bp-theme="dark"] .upper header img {
 }
 
 /* 案内アラート・警告メッセージ */
-html[data-bp-theme="dark"] .alert-info {
-  background-color: rgba(56, 189, 248, 0.12);
-  color: #7dd3fc;
-  border-color: rgba(56, 189, 248, 0.35);
-}
-
 html[data-bp-theme="dark"] .lower .alert-info {
-  border-color: rgba(56, 189, 248, 0.4);
+  border-color: rgba(56, 189, 248, 0.4) !important;
 }
 
 html[data-bp-theme="dark"] .alert-info-icon:before {
@@ -329,6 +377,65 @@ html[data-bp-theme="dark"] .card-body,
 html[data-bp-theme="dark"] .card-body.bg-white,
 html[data-bp-theme="dark"] .bg-white {
   background-color: #1e293b !important;
+  color: #e2e8f0 !important;
+}
+
+/* お知らせ（管理者からのお知らせ・Quillエディタ出力）本文およびリンクのダークモード配色 */
+html[data-bp-theme="dark"] div[id^="PortalComment"] .ql-editor,
+html[data-bp-theme="dark"] .ql-editor {
+  color: #e2e8f0;
+}
+
+html[data-bp-theme="dark"] div[id^="PortalComment"] .ql-editor a,
+html[data-bp-theme="dark"] .ql-editor a {
+  color: #7dd3fc !important;
+}
+
+/* お知らせ内でインラインスタイル（style="color: rgb(0, 0, 0)" 等）として黒色・極暗色が指定された要素の視認性改善 */
+html[data-bp-theme="dark"] div[id^="PortalComment"] [style*="color: rgb(0, 0, 0)" i],
+html[data-bp-theme="dark"] div[id^="PortalComment"] [style*="color: rgb(0,0,0)" i],
+html[data-bp-theme="dark"] div[id^="PortalComment"] [style*="color:rgb(0, 0, 0)" i],
+html[data-bp-theme="dark"] div[id^="PortalComment"] [style*="color:rgb(0,0,0)" i],
+html[data-bp-theme="dark"] div[id^="PortalComment"] [style*="color: rgba(0, 0, 0" i],
+html[data-bp-theme="dark"] div[id^="PortalComment"] [style*="color: rgba(0,0,0" i],
+html[data-bp-theme="dark"] div[id^="PortalComment"] [style*="color:rgba(0, 0, 0" i],
+html[data-bp-theme="dark"] div[id^="PortalComment"] [style*="color:rgba(0,0,0" i],
+html[data-bp-theme="dark"] div[id^="PortalComment"] [style*="color: #000000" i],
+html[data-bp-theme="dark"] div[id^="PortalComment"] [style*="color:#000000" i],
+html[data-bp-theme="dark"] div[id^="PortalComment"] [style*="color: #000;" i],
+html[data-bp-theme="dark"] div[id^="PortalComment"] [style*="color:#000;" i],
+html[data-bp-theme="dark"] div[id^="PortalComment"] [style*="color: #000 " i],
+html[data-bp-theme="dark"] div[id^="PortalComment"] [style*="color:#000 " i],
+html[data-bp-theme="dark"] div[id^="PortalComment"] [style$="color: #000" i],
+html[data-bp-theme="dark"] div[id^="PortalComment"] [style$="color:#000" i],
+html[data-bp-theme="dark"] div[id^="PortalComment"] [style*="color: black" i],
+html[data-bp-theme="dark"] div[id^="PortalComment"] [style*="color:black" i],
+html[data-bp-theme="dark"] div[id^="PortalComment"] [style*="color: windowtext" i],
+html[data-bp-theme="dark"] div[id^="PortalComment"] [style*="color:windowtext" i],
+html[data-bp-theme="dark"] div[id^="PortalComment"] [style*="color: rgb(34, 34, 34)" i],
+html[data-bp-theme="dark"] div[id^="PortalComment"] [style*="color: rgb(51, 51, 51)" i],
+html[data-bp-theme="dark"] .ql-editor [style*="color: rgb(0, 0, 0)" i],
+html[data-bp-theme="dark"] .ql-editor [style*="color: rgb(0,0,0)" i],
+html[data-bp-theme="dark"] .ql-editor [style*="color:rgb(0, 0, 0)" i],
+html[data-bp-theme="dark"] .ql-editor [style*="color:rgb(0,0,0)" i],
+html[data-bp-theme="dark"] .ql-editor [style*="color: rgba(0, 0, 0" i],
+html[data-bp-theme="dark"] .ql-editor [style*="color: rgba(0,0,0" i],
+html[data-bp-theme="dark"] .ql-editor [style*="color:rgba(0, 0, 0" i],
+html[data-bp-theme="dark"] .ql-editor [style*="color:rgba(0,0,0" i],
+html[data-bp-theme="dark"] .ql-editor [style*="color: #000000" i],
+html[data-bp-theme="dark"] .ql-editor [style*="color:#000000" i],
+html[data-bp-theme="dark"] .ql-editor [style*="color: #000;" i],
+html[data-bp-theme="dark"] .ql-editor [style*="color:#000;" i],
+html[data-bp-theme="dark"] .ql-editor [style*="color: #000 " i],
+html[data-bp-theme="dark"] .ql-editor [style*="color:#000 " i],
+html[data-bp-theme="dark"] .ql-editor [style$="color: #000" i],
+html[data-bp-theme="dark"] .ql-editor [style$="color:#000" i],
+html[data-bp-theme="dark"] .ql-editor [style*="color: black" i],
+html[data-bp-theme="dark"] .ql-editor [style*="color:black" i],
+html[data-bp-theme="dark"] .ql-editor [style*="color: windowtext" i],
+html[data-bp-theme="dark"] .ql-editor [style*="color:windowtext" i],
+html[data-bp-theme="dark"] .ql-editor [style*="color: rgb(34, 34, 34)" i],
+html[data-bp-theme="dark"] .ql-editor [style*="color: rgb(51, 51, 51)" i] {
   color: #e2e8f0 !important;
 }
 
