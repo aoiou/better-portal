@@ -250,8 +250,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     saveSettings({ showFeedback: true });
   });
 
-  // 3. Enterキー：即時保存してフォーカスを外す
+  // 3. Enterキー：即時保存してフォーカスを外す（日本語IME変換確定時は除外）
   usernameInput.addEventListener('keydown', (e) => {
+    if (e.isComposing || e.keyCode === 229) return;
     if (e.key === 'Enter') {
       e.preventDefault();
       saveSettings({ showFeedback: true });
@@ -345,6 +346,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       themeToggle?.focus();
     }
   });
+
+  // メニュー外へのフォーカス移動で閉じる
+  if (themeMenu) {
+    themeMenu.addEventListener('focusout', (e) => {
+      if (!themeMenu.contains(e.relatedTarget) && e.relatedTarget !== themeToggle) {
+        closeThemeMenu();
+      }
+    });
+  }
 
   // OSテーマ設定変更リスナー（システム設定時のみ動的追従）
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {

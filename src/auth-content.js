@@ -123,6 +123,7 @@
   const state = {
     filled: false,
     submitted: false,
+    submitScheduled: false,
     fido2Clicked: false,
     fido2ClickScheduled: false,
     switchedToPasswordTab: false,
@@ -132,7 +133,7 @@
 
   // 「次へ」ボタンを自動クリック
   function clickNextButton() {
-    if (state.submitted) return;
+    if (state.submitted || state.submitScheduled) return;
 
     const nextBtn = document.querySelector(SUBMIT_BUTTON_SELECTOR);
     const loginForm = document.querySelector('form#login');
@@ -145,7 +146,10 @@
     // ボタンが無効化されている場合はスキップ
     if (nextBtn.disabled) return;
 
+    state.submitScheduled = true;
+
     setTimeout(() => {
+      state.submitScheduled = false;
       if (!isStepTwo() && !nextBtn.disabled) {
         state.submitted = true;
         nextBtn.click();
@@ -245,7 +249,7 @@
   }
 
   // 入力処理（要素を探して入力）
-  async function attemptAutofill(settings) {
+  function attemptAutofill(settings) {
     if (state.filled) return false;
 
     const username = settings.username;
@@ -282,8 +286,8 @@
   function checkAndStopObserver() {
     if (!observer) return;
 
-    // Step 1: ユーザー名入力＋送信が完了 → Step 2 に遷移済み
-    const step1Done = state.filled && isStepTwo();
+    // Step 1: 画面遷移（Step 2）に到達していればStep 1は完了（手動入力や未入力の場合も含む）
+    const step1Done = isStepTwo();
 
     // Step 2: FIDO2 クリック済み、またはパスワードタブ切替＋フォーカス完了
     const step2Done = state.fido2Clicked ||
@@ -317,7 +321,7 @@
     try {
       const settings = await getSettings();
 
-      await attemptAutofill(settings);
+      attemptAutofill(settings);
       attemptFido2Click(settings);
       attemptSwitchToPasswordTab(settings);
       attemptFocusPassword();

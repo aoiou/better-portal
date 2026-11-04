@@ -76,6 +76,41 @@
     };
   }
 
+  function normalizeSettings(raw) {
+    const defaults = getDefaultSettings();
+    if (!raw || typeof raw !== "object") return defaults;
+    return {
+      hiddenIds: Array.isArray(raw.hiddenIds)
+        ? raw.hiddenIds.filter((id) => typeof id === "string")
+        : defaults.hiddenIds,
+      order: Array.isArray(raw.order)
+        ? raw.order.filter((id) => typeof id === "string")
+        : defaults.order,
+      hideNavbar: Boolean(raw.hideNavbar),
+      hidePageTitle: Boolean(raw.hidePageTitle),
+      hideSearchBar: Boolean(raw.hideSearchBar),
+      hideSubNav: Boolean(raw.hideSubNav),
+      noticeToBottom: Boolean(raw.noticeToBottom),
+      m365RedirectUrl: typeof raw.m365RedirectUrl === "string" ? raw.m365RedirectUrl.trim() : defaults.m365RedirectUrl,
+      customCards: Array.isArray(raw.customCards)
+        ? raw.customCards.filter((c) => c && typeof c === "object" && typeof c.id === "string" && typeof c.title === "string")
+        : defaults.customCards,
+    };
+  }
+
+  async function loadSettings() {
+    try {
+      const result = await storageGet(STORAGE_KEY);
+      return normalizeSettings(result[STORAGE_KEY]);
+    } catch {
+      return getDefaultSettings();
+    }
+  }
+
+  function saveSettings(settings) {
+    storageSet({ [STORAGE_KEY]: settings });
+  }
+
   /* ---------------------------------------------------------------------
    * オリジナルカード
    * --------------------------------------------------------------------- */
@@ -178,8 +213,9 @@
     for (const key of Object.keys(link.dataset)) delete link.dataset[key];
     link.removeAttribute("onclick");
     link.onclick = null;
-    link.href = card.url;
-    link.title = card.url;
+    const safeUrl = normalizeUrl(card.url) || "#";
+    link.href = safeUrl;
+    link.title = safeUrl;
     link.target = "_blank";
     link.rel = "noopener noreferrer";
 
@@ -400,6 +436,22 @@
         e.preventDefault();
         e.stopPropagation();
         closeCardModal();
+      } else if (e.key === "Tab") {
+        const focusables = Array.from(
+          dialog.querySelectorAll(
+            'button:not([disabled]), input:not([disabled]):not([hidden]), [tabindex]:not([tabindex="-1"])'
+          )
+        ).filter((el) => el.offsetParent !== null);
+        if (focusables.length === 0) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
       }
     };
     document.addEventListener("keydown", onKeydown, true);
@@ -461,9 +513,9 @@
     }
     if (/^https?:\/\/login\.microsoftonline\.com\//i.test(trimmed) || !/[?&]wreply=/i.test(originalOnclick)) {
       const escaped = trimmed.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
-      return originalOnclick.replace(/https?:\/\/[^'"]+/i, escaped);
+      return originalOnclick.replace(/https?:\/\/[^'"]+/i, () => escaped);
     }
-    return originalOnclick.replace(/([?&]wreply=)[^'&"]+/i, "$1" + encodeURIComponent(trimmed));
+    return originalOnclick.replace(/([?&]wreply=)[^'&"]+/i, (_match, p1) => p1 + encodeURIComponent(trimmed));
   }
 
   function applyM365Redirect(el, settings) {
@@ -489,25 +541,13 @@
     }
   }
 
-  async function loadSettings() {
-    try {
-      const result = await storageGet(STORAGE_KEY);
-      return { ...getDefaultSettings(), ...result[STORAGE_KEY] };
-    } catch {
-      return getDefaultSettings();
-    }
-  }
-
-  function saveSettings(settings) {
-    storageSet({ [STORAGE_KEY]: settings });
-  }
-
   function getAllServiceCards() {
     return [...document.querySelectorAll('[id^="div-"][class*="col-"]:has(.service-thumb-wrap)')];
   }
 
   function createButton(className, text, onClick) {
     const btn = document.createElement("button");
+    btn.type = "button";
     btn.className = "bp-btn " + className;
     btn.draggable = false;
     btn.textContent = text;
@@ -546,6 +586,9 @@
       }
     ));
 
+    if (!("bpPrevPosition" in targetEl.dataset)) {
+      targetEl.dataset.bpPrevPosition = targetEl.style.position || "";
+    }
     targetEl.style.position = "relative";
     targetEl.appendChild(wrapper);
   }
@@ -561,7 +604,14 @@
   }
 
   function cleanupTogglableElements(settings) {
-    document.querySelectorAll(".bp-toggle-overlay").forEach((el) => el.remove());
+    document.querySelectorAll(".bp-toggle-overlay").forEach((el) => {
+      const parent = el.parentElement;
+      if (parent && "bpPrevPosition" in parent.dataset) {
+        parent.style.position = parent.dataset.bpPrevPosition;
+        delete parent.dataset.bpPrevPosition;
+      }
+      el.remove();
+    });
     applyExtraHides(settings);
   }
 
@@ -641,7 +691,17 @@
               settings.m365RedirectUrl || ""
             );
             if (input === null) return;
-            settings.m365RedirectUrl = input.trim();
+            const trimmed = input.trim();
+            if (!trimmed) {
+              settings.m365RedirectUrl = "";
+            } else {
+              const validated = normalizeUrl(trimmed);
+              if (!validated) {
+                alert("有効なURL（http:// または https://）を入力してください。");
+                return;
+              }
+              settings.m365RedirectUrl = validated;
+            }
             saveSettings(settings);
             onUpdate();
           }
@@ -906,20 +966,30 @@
   }
 
   async function init() {
-    mainRow = findServiceRow();
-    const hasToggleTarget = TOGGLE_CONFIG.some((cfg) => cfg.find());
-    if (!mainRow && !hasToggleTarget) {
+    // 万一の初期化エラー時にも最長2秒で必ずページを表示状態にするセーフティタイマー（FOUC対策のフェイルセーフ）
+    const safetyTimer = setTimeout(() => {
       document.body?.classList.add("bp-ready");
-      return;
-    }
+    }, 2000);
 
-    const settings = await loadSettings();
-    if (mainRow) {
-      initDragAndDrop(settings);
+    try {
+      mainRow = findServiceRow();
+      const hasToggleTarget = TOGGLE_CONFIG.some((cfg) => cfg.find());
+      if (!mainRow && !hasToggleTarget) {
+        return;
+      }
+
+      const settings = await loadSettings();
+      if (mainRow) {
+        initDragAndDrop(settings);
+      }
+      applyLayout(settings);
+      createSettingsButton(settings);
+    } catch (err) {
+      console.error("[Better Portal] Failed to initialize portal customizer:", err);
+    } finally {
+      clearTimeout(safetyTimer);
+      document.body?.classList.add("bp-ready");
     }
-    applyLayout(settings);
-    createSettingsButton(settings);
-    document.body.classList.add("bp-ready");
   }
 
   if (document.readyState === "loading") {

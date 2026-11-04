@@ -9,9 +9,12 @@
 
     link.setAttribute("onclick", onclick);
 
-    const match = onclick.match(/doPortal\(\s*'((?:\\'|[^'])*)'\s*\)/);
+    const match = onclick.match(/doPortal\(\s*(['"])((?:\\\1|(?!\1).)*)\1\s*\)/);
     if (match) {
-      const url = match[1].replace(/\\'/g, "'").replace(/\\\\/g, "\\");
+      const quote = match[1];
+      const rawUrl = match[2];
+      const unescapedQuote = new RegExp(`\\\\${quote}`, "g");
+      const url = rawUrl.replace(unescapedQuote, quote).replace(/\\\\/g, "\\");
       link.onclick = function () {
         if (typeof window.doPortal === "function") {
           return window.doPortal(url);
