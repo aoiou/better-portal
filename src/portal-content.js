@@ -1,9 +1,34 @@
 (function () {
   "use strict";
 
-  const STORAGE_KEY = "betterPortalSettings";
-  const CUSTOM_ID_PREFIX = "bp-custom-";
-  const SVG_NS = "http://www.w3.org/2000/svg";
+  /* =====================================================================
+   * 定数・設定定義 (CONSTANTS)
+   * ===================================================================== */
+  const CONSTANTS = {
+    STORAGE_KEY: "betterPortalSettings",
+    CUSTOM_ID_PREFIX: "bp-custom-",
+    SVG_NS: "http://www.w3.org/2000/svg",
+    CLASSES: {
+      EDIT_MODE: "bp-edit-mode",
+      READY: "bp-ready",
+      SERVICE_CARD: "bp-service-card",
+      CUSTOM_CARD: "bp-custom-card",
+      HIDDEN_ITEM: "bp-hidden-item",
+      DRAGGING: "bp-dragging",
+      DROP_BEFORE: "bp-drop-before",
+      DROP_AFTER: "bp-drop-after",
+      EDIT_OVERLAY: "bp-edit-overlay",
+      TOGGLE_OVERLAY: "bp-toggle-overlay",
+    },
+    EVENTS: {
+      ONCLICK_CHANGE: "bp-onclick-change",
+    },
+    SELECTOR: {
+      SERVICE_ROW: '.row:has([id^="div-"][class*="col-"] .service-thumb-wrap)',
+      SERVICE_CARDS: '[id^="div-"][class*="col-"]:has(.service-thumb-wrap)',
+    },
+  };
+
   let mainRow = null;
   let hiddenSectionOpen = false;
   let draggedCardId = null;
@@ -36,15 +61,18 @@
     },
   ];
 
+  /* =====================================================================
+   * ストレージ層 (Storage & Settings)
+   * ===================================================================== */
   async function storageGet(keys) {
     try {
       const syncResult = await browser.storage.sync.get(keys);
-      if (syncResult && syncResult[STORAGE_KEY] !== undefined) {
+      if (syncResult && syncResult[CONSTANTS.STORAGE_KEY] !== undefined) {
         return syncResult;
       }
       const localResult = await browser.storage.local.get(keys);
-      if (localResult && localResult[STORAGE_KEY] !== undefined) {
-        await browser.storage.sync.set({ [STORAGE_KEY]: localResult[STORAGE_KEY] }).catch(() => {});
+      if (localResult && localResult[CONSTANTS.STORAGE_KEY] !== undefined) {
+        await browser.storage.sync.set({ [CONSTANTS.STORAGE_KEY]: localResult[CONSTANTS.STORAGE_KEY] }).catch(() => {});
         return localResult;
       }
       return syncResult;
@@ -100,22 +128,64 @@
 
   async function loadSettings() {
     try {
-      const result = await storageGet(STORAGE_KEY);
-      return normalizeSettings(result[STORAGE_KEY]);
-    } catch {
+      const result = await storageGet(CONSTANTS.STORAGE_KEY);
+      return normalizeSettings(result[CONSTANTS.STORAGE_KEY]);
+    } catch (err) {
+      console.error("[Better Portal] Failed to load settings:", err);
       return getDefaultSettings();
     }
   }
 
-  function saveSettings(settings) {
-    storageSet({ [STORAGE_KEY]: settings });
+  async function saveSettings(settings) {
+    try {
+      await storageSet({ [CONSTANTS.STORAGE_KEY]: settings });
+    } catch (err) {
+      console.error("[Better Portal] Failed to save settings:", err);
+    }
   }
 
-  /* ---------------------------------------------------------------------
-   * オリジナルカード
-   * --------------------------------------------------------------------- */
+  /* =====================================================================
+   * 並び順計算ロジック (OrderLogic - 純粋関数 / SRP)
+   * ===================================================================== */
+  const OrderLogic = {
+    calcMoveOrder(order, hiddenIds, cardId, direction) {
+      const idx = order.indexOf(cardId);
+      if (idx < 0) return null;
 
-  // http/https のみ許可。スキーム省略時は https:// を補完する。不正な場合は null。
+      const visibleOrder = order.filter((id) => !hiddenIds.includes(id));
+      const visibleIdx = visibleOrder.indexOf(cardId);
+      if (visibleIdx < 0) return null;
+
+      const newVisibleIdx = visibleIdx + direction;
+      if (newVisibleIdx < 0 || newVisibleIdx >= visibleOrder.length) return null;
+
+      const swapId = visibleOrder[newVisibleIdx];
+      const swapIdx = order.indexOf(swapId);
+
+      const newOrder = [...order];
+      newOrder[idx] = swapId;
+      newOrder[swapIdx] = cardId;
+      return newOrder;
+    },
+
+    calcDragReorder(order, draggedId, targetId, insertBefore) {
+      const newOrder = [...order];
+      const dragIdx = newOrder.indexOf(draggedId);
+      if (dragIdx < 0) return null;
+
+      newOrder.splice(dragIdx, 1);
+      let targetIdx = newOrder.indexOf(targetId);
+      if (targetIdx < 0) return null;
+
+      if (!insertBefore) targetIdx++;
+      newOrder.splice(targetIdx, 0, draggedId);
+      return newOrder;
+    },
+  };
+
+  /* =====================================================================
+   * URLユーティリティ & M365サービス (UrlUtils & M365Service)
+   * ===================================================================== */
   function normalizeUrl(input) {
     let value = (input || "").trim();
     if (!value) return null;
@@ -132,18 +202,206 @@
     }
   }
 
+  function isM365Card(el) {
+    if (el.classList.contains(CONSTANTS.CLASSES.CUSTOM_CARD)) return false;
+    const spanText = el.querySelector("span")?.textContent?.trim();
+    if (spanText === "Microsoft365") return true;
+
+    const link = el.querySelector("a.service-thumb");
+    const currentOnclick = link?.getAttribute("onclick") || "";
+    const originalOnclick = link?.dataset.bpOriginalOnclick || "";
+    return currentOnclick.includes("login.microsoftonline.com") ||
+           originalOnclick.includes("login.microsoftonline.com");
+  }
+
+  function buildM365Onclick(originalOnclick, inputUrl) {
+    let trimmed = inputUrl.trim();
+    if (!trimmed || !originalOnclick) return originalOnclick;
+    if (!/^https?:\/\//i.test(trimmed)) {
+      trimmed = "https://" + trimmed;
+    }
+    if (/^https?:\/\/login\.microsoftonline\.com\//i.test(trimmed) || !/[?&]wreply=/i.test(originalOnclick)) {
+      const escaped = trimmed.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+      return originalOnclick.replace(/https?:\/\/[^'"]+/i, () => escaped);
+    }
+    return originalOnclick.replace(/([?&]wreply=)[^'&"]+/i, (_match, p1) => p1 + encodeURIComponent(trimmed));
+  }
+
+  function applyM365Redirect(el, settings) {
+    if (!isM365Card(el)) return;
+    const link = el.querySelector("a.service-thumb");
+    if (!link) return;
+
+    if (!("bpOriginalOnclick" in link.dataset)) {
+      link.dataset.bpOriginalOnclick = link.getAttribute("onclick") || "";
+    }
+
+    const originalOnclick = link.dataset.bpOriginalOnclick;
+    if (!originalOnclick) return;
+
+    const customUrl = settings.m365RedirectUrl?.trim();
+    const targetOnclick = customUrl
+      ? buildM365Onclick(originalOnclick, customUrl)
+      : originalOnclick;
+
+    if (link.getAttribute("onclick") !== targetOnclick) {
+      link.dataset.bpOnclick = targetOnclick;
+      link.dispatchEvent(new CustomEvent(CONSTANTS.EVENTS.ONCLICK_CHANGE, { bubbles: true }));
+    }
+  }
+
+  /* =====================================================================
+   * モーダルダイアログ基盤 (Modal Dialog Framework - DRY & A11y)
+   * ===================================================================== */
+  function closeModal() {
+    if (!activeModal) return;
+    document.removeEventListener("keydown", activeModal.onKeydown, true);
+    activeModal.backdrop.remove();
+    activeModal = null;
+  }
+
+  function createModalFrame({ title, ariaLabel, submitText, onRenderBody, onSubmit }) {
+    closeModal();
+
+    const make = (tag, className, text) => {
+      const el = document.createElement(tag);
+      if (className) el.className = className;
+      if (text != null) el.textContent = text;
+      return el;
+    };
+
+    const backdrop = make("div", "bp-modal-backdrop");
+    const dialog = make("div", "bp-modal-dialog");
+    dialog.setAttribute("role", "dialog");
+    dialog.setAttribute("aria-modal", "true");
+    dialog.setAttribute("aria-label", ariaLabel || title);
+
+    const form = make("form", "bp-modal-form");
+    form.noValidate = true;
+    form.appendChild(make("h3", "bp-modal-title", title));
+
+    const errorEl = make("p", "bp-modal-error");
+
+    const makeField = (labelText, input, hint) => {
+      const field = make("label", "bp-modal-field");
+      field.appendChild(make("span", "bp-modal-label", labelText));
+      field.appendChild(input);
+      if (hint) field.appendChild(make("span", "bp-modal-hint", hint));
+      return field;
+    };
+
+    onRenderBody({ form, make, makeField, errorEl });
+    form.appendChild(errorEl);
+
+    const actions = make("div", "bp-modal-actions");
+    const cancelBtn = make("button", "bp-btn bp-btn-cancel", "キャンセル");
+    cancelBtn.type = "button";
+    const saveBtn = make("button", "bp-btn bp-btn-save", submitText || "保存");
+    saveBtn.type = "submit";
+    actions.append(cancelBtn, saveBtn);
+    form.appendChild(actions);
+
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      onSubmit({ errorEl, closeModal });
+    });
+
+    cancelBtn.addEventListener("click", closeModal);
+    backdrop.addEventListener("mousedown", (e) => {
+      if (e.target === backdrop) closeModal();
+    });
+
+    const onKeydown = (e) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        closeModal();
+      } else if (e.key === "Tab") {
+        const focusables = Array.from(
+          dialog.querySelectorAll(
+            'button:not([disabled]), input:not([disabled]):not([hidden]), [tabindex]:not([tabindex="-1"])'
+          )
+        ).filter((el) => el.offsetParent !== null);
+        if (focusables.length === 0) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    document.addEventListener("keydown", onKeydown, true);
+
+    dialog.appendChild(form);
+    backdrop.appendChild(dialog);
+    document.body.appendChild(backdrop);
+    activeModal = { backdrop, onKeydown };
+
+    return { dialog, form, errorEl };
+  }
+
+  function openM365UrlModal(currentUrl, onSave) {
+    let urlInput = null;
+    createModalFrame({
+      title: "Microsoft365の遷移先設定",
+      ariaLabel: "Microsoft365の遷移先URLを設定",
+      submitText: "保存",
+      onRenderBody({ form, make, makeField }) {
+        urlInput = make("input", "bp-modal-input");
+        urlInput.type = "text";
+        urlInput.inputMode = "url";
+        urlInput.maxLength = 2000;
+        urlInput.placeholder = "例: https://doshishaacjp-my.sharepoint.com/my";
+        urlInput.value = currentUrl || "";
+
+        form.appendChild(
+          makeField(
+            "遷移先URL",
+            urlInput,
+            "「https://」は省略できます。空欄で保存するとデフォルトに戻ります。"
+          )
+        );
+      },
+      onSubmit({ errorEl, closeModal: closeFn }) {
+        const raw = urlInput.value.trim();
+        if (!raw) {
+          closeFn();
+          onSave("");
+          return;
+        }
+        const validated = normalizeUrl(raw);
+        if (!validated) {
+          errorEl.textContent = "有効なURL（http:// または https://）を入力してください。";
+          urlInput.focus();
+          return;
+        }
+        closeFn();
+        onSave(validated);
+      },
+    });
+
+    urlInput?.focus();
+  }
+
+  /* =====================================================================
+   * オリジナルカード・DOMコンポーネント (Card Components)
+   * ===================================================================== */
   function generateCustomCardId() {
     return Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7);
   }
 
   function findCustomCard(settings, elementId) {
-    if (!elementId.startsWith(CUSTOM_ID_PREFIX)) return null;
-    const id = elementId.slice(CUSTOM_ID_PREFIX.length);
+    if (!elementId.startsWith(CONSTANTS.CUSTOM_ID_PREFIX)) return null;
+    const id = elementId.slice(CONSTANTS.CUSTOM_ID_PREFIX.length);
     return settings.customCards.find((c) => c.id === id) || null;
   }
 
   function createDefaultIconSvg() {
-    const svg = document.createElementNS(SVG_NS, "svg");
+    const svg = document.createElementNS(CONSTANTS.SVG_NS, "svg");
     svg.setAttribute("viewBox", "0 0 24 24");
     svg.setAttribute("class", "bp-card-default-icon");
     svg.setAttribute("aria-hidden", "true");
@@ -153,7 +411,7 @@
       "M12 2a15 15 0 0 1 4 10a15 15 0 0 1-4 10a15 15 0 0 1-4-10a15 15 0 0 1 4-10z",
     ];
     for (const d of paths) {
-      const path = document.createElementNS(SVG_NS, "path");
+      const path = document.createElementNS(CONSTANTS.SVG_NS, "path");
       path.setAttribute("d", d);
       path.setAttribute("fill", "none");
       path.setAttribute("stroke", "currentColor");
@@ -190,11 +448,16 @@
     return wrap;
   }
 
-  // 既存カードを雛形として保存（ポータル側のグリッド幅・カード構造を引き継ぐため）
   function createCardTemplate(sourceCard) {
     const tpl = sourceCard.cloneNode(true);
-    tpl.querySelectorAll(".bp-edit-overlay").forEach((el) => el.remove());
-    tpl.classList.remove("bp-service-card", "bp-hidden-item", "bp-dragging", "bp-drop-before", "bp-drop-after");
+    tpl.querySelectorAll("." + CONSTANTS.CLASSES.EDIT_OVERLAY).forEach((el) => el.remove());
+    tpl.classList.remove(
+      CONSTANTS.CLASSES.SERVICE_CARD,
+      CONSTANTS.CLASSES.HIDDEN_ITEM,
+      CONSTANTS.CLASSES.DRAGGING,
+      CONSTANTS.CLASSES.DROP_BEFORE,
+      CONSTANTS.CLASSES.DROP_AFTER
+    );
     tpl.removeAttribute("draggable");
     tpl.removeAttribute("style");
     return tpl;
@@ -205,8 +468,8 @@
     const el = cardTemplate.cloneNode(true);
     el.querySelectorAll("[id]").forEach((n) => n.removeAttribute("id"));
     el.querySelectorAll("[onclick]").forEach((n) => n.removeAttribute("onclick"));
-    el.id = CUSTOM_ID_PREFIX + card.id;
-    el.classList.add("bp-custom-card");
+    el.id = CONSTANTS.CUSTOM_ID_PREFIX + card.id;
+    el.classList.add(CONSTANTS.CLASSES.CUSTOM_CARD);
 
     const link = el.querySelector("a.service-thumb");
     if (!link) return null;
@@ -231,25 +494,17 @@
     }
     label.textContent = card.title;
 
-    // クリック処理は window キャプチャフェーズの guardCustomCardClick で一括して行う
     return el;
   }
 
-  // オリジナルカードのリンククリックをポータル側スクリプトから隔離する。
-  // ポータルはカード（a.service-thumb 等）へのクリックを委譲ハンドラで拾い、
-  // 独自のリダイレクト処理（doPortal 相当）に回すことがある（Chromium 系で発生）。
-  // その場合 URL 指定が無いためフォールバック先へ飛ばされてしまうので、
-  // document_start 時点で window のキャプチャフェーズに登録し、ページ側のどのハンドラよりも先に
-  // 伝播を止める。preventDefault はしないため、href / target="_blank" による標準遷移はそのまま行われる。
   function guardCustomCardClick(e) {
     const target = e.target instanceof Element ? e.target : e.target?.parentElement;
     if (!target) return;
-    if (target.closest(".bp-edit-overlay")) return;
-    const link = target.closest(".bp-custom-card a.service-thumb");
+    if (target.closest("." + CONSTANTS.CLASSES.EDIT_OVERLAY)) return;
+    const link = target.closest("." + CONSTANTS.CLASSES.CUSTOM_CARD + " a.service-thumb");
     if (!link) return;
     e.stopImmediatePropagation();
-    // 編集モード中はリンク遷移（中クリック等を含む）を無効化する
-    if (document.body.classList.contains("bp-edit-mode")) {
+    if (document.body.classList.contains(CONSTANTS.CLASSES.EDIT_MODE)) {
       e.preventDefault();
     }
   }
@@ -267,111 +522,10 @@
     onUpdate();
   }
 
-  function closeCardModal() {
-    if (!activeModal) return;
-    document.removeEventListener("keydown", activeModal.onKeydown, true);
-    activeModal.backdrop.remove();
-    activeModal = null;
-  }
-
   function openCardModal(card, onSave) {
-    closeCardModal();
-
-    const make = (tag, className, text) => {
-      const el = document.createElement(tag);
-      if (className) el.className = className;
-      if (text != null) el.textContent = text;
-      return el;
-    };
-
-    const backdrop = make("div", "bp-modal-backdrop");
-    const dialog = make("div", "bp-modal-dialog");
-    dialog.setAttribute("role", "dialog");
-    dialog.setAttribute("aria-modal", "true");
-    dialog.setAttribute("aria-label", card ? "オリジナルカードを編集" : "オリジナルカードを追加");
-
-    const form = make("form", "bp-modal-form");
-    form.noValidate = true;
-    form.appendChild(make("h3", "bp-modal-title", card ? "オリジナルカードを編集" : "オリジナルカードを追加"));
-
-    const makeField = (labelText, input, hint) => {
-      const field = make("label", "bp-modal-field");
-      field.appendChild(make("span", "bp-modal-label", labelText));
-      field.appendChild(input);
-      if (hint) field.appendChild(make("span", "bp-modal-hint", hint));
-      return field;
-    };
-
-    const titleInput = make("input", "bp-modal-input");
-    titleInput.type = "text";
-    titleInput.maxLength = 40;
-    titleInput.placeholder = "例: Google Classroom";
-    titleInput.value = card?.title || "";
-
-    const urlInput = make("input", "bp-modal-input");
-    urlInput.type = "text";
-    urlInput.inputMode = "url";
-    urlInput.maxLength = 2000;
-    urlInput.placeholder = "例: https://classroom.google.com/";
-    urlInput.value = card?.url || "";
-
-    form.appendChild(makeField("タイトル", titleInput));
-    form.appendChild(makeField("URL", urlInput, "「https://」は省略できます"));
-
-    // アイコン種別
-    const iconField = make("div", "bp-modal-field");
-    iconField.appendChild(make("span", "bp-modal-label", "アイコン"));
-    const radioRow = make("div", "bp-modal-radio-row");
-    const radioName = "bp-icon-type-" + generateCustomCardId();
+    let titleInput, urlInput, emojiInput, iconUrlInput, previewCard;
     const radios = {};
-    for (const [value, text] of [["default", "デフォルト"], ["emoji", "絵文字"], ["url", "画像URL"]]) {
-      const label = make("label", "bp-modal-radio");
-      const radio = make("input");
-      radio.type = "radio";
-      radio.name = radioName;
-      radio.value = value;
-      radios[value] = radio;
-      label.append(radio, make("span", null, text));
-      radioRow.appendChild(label);
-    }
-    iconField.appendChild(radioRow);
-
-    const emojiInput = make("input", "bp-modal-input bp-modal-emoji-input");
-    emojiInput.type = "text";
-    emojiInput.maxLength = 16;
-    emojiInput.placeholder = "例: 📚";
-
-    const iconUrlInput = make("input", "bp-modal-input");
-    iconUrlInput.type = "text";
-    iconUrlInput.inputMode = "url";
-    iconUrlInput.maxLength = 2000;
-    iconUrlInput.placeholder = "例: https://example.com/icon.png";
-
-    const initialType = card?.iconType || "default";
-    radios[initialType in radios ? initialType : "default"].checked = true;
-    if (initialType === "emoji") emojiInput.value = card.iconValue || "";
-    if (initialType === "url") iconUrlInput.value = card.iconValue || "";
-
-    iconField.append(emojiInput, iconUrlInput);
-    form.appendChild(iconField);
-
-    // プレビュー
-    const previewField = make("div", "bp-modal-field");
-    previewField.appendChild(make("span", "bp-modal-label", "プレビュー"));
-    const previewCard = make("div", "bp-preview-card");
-    previewField.appendChild(previewCard);
-    form.appendChild(previewField);
-
-    const errorEl = make("p", "bp-modal-error");
-    form.appendChild(errorEl);
-
-    const actions = make("div", "bp-modal-actions");
-    const cancelBtn = make("button", "bp-btn bp-btn-cancel", "キャンセル");
-    cancelBtn.type = "button";
-    const saveBtn = make("button", "bp-btn bp-btn-save", card ? "保存" : "追加");
-    saveBtn.type = "submit";
-    actions.append(cancelBtn, saveBtn);
-    form.appendChild(actions);
+    const radioName = "bp-icon-type-" + generateCustomCardId();
 
     const getIconType = () => Object.values(radios).find((r) => r.checked)?.value || "default";
     const getIconValue = (type) =>
@@ -387,79 +541,106 @@
       const key = JSON.stringify([type, value, title]);
       if (key === lastPreviewKey) return;
       lastPreviewKey = key;
-      previewCard.replaceChildren(
-        createIconElement(type, value, true),
-        make("span", "bp-preview-title", title)
-      );
+      const previewTitle = document.createElement("span");
+      previewTitle.className = "bp-preview-title";
+      previewTitle.textContent = title;
+      previewCard.replaceChildren(createIconElement(type, value, true), previewTitle);
     }
+
+    const { form, errorEl } = createModalFrame({
+      title: card ? "オリジナルカードを編集" : "オリジナルカードを追加",
+      ariaLabel: card ? "オリジナルカードを編集" : "オリジナルカードを追加",
+      submitText: card ? "保存" : "追加",
+      onRenderBody({ form: modalForm, make, makeField }) {
+        titleInput = make("input", "bp-modal-input");
+        titleInput.type = "text";
+        titleInput.maxLength = 40;
+        titleInput.placeholder = "例: Google Classroom";
+        titleInput.value = card?.title || "";
+
+        urlInput = make("input", "bp-modal-input");
+        urlInput.type = "text";
+        urlInput.inputMode = "url";
+        urlInput.maxLength = 2000;
+        urlInput.placeholder = "例: https://classroom.google.com/";
+        urlInput.value = card?.url || "";
+
+        modalForm.appendChild(makeField("タイトル", titleInput));
+        modalForm.appendChild(makeField("URL", urlInput, "「https://」は省略できます"));
+
+        const iconField = make("div", "bp-modal-field");
+        iconField.appendChild(make("span", "bp-modal-label", "アイコン"));
+        const radioRow = make("div", "bp-modal-radio-row");
+        for (const [value, text] of [["default", "デフォルト"], ["emoji", "絵文字"], ["url", "画像URL"]]) {
+          const label = make("label", "bp-modal-radio");
+          const radio = make("input");
+          radio.type = "radio";
+          radio.name = radioName;
+          radio.value = value;
+          radios[value] = radio;
+          label.append(radio, make("span", null, text));
+          radioRow.appendChild(label);
+        }
+        iconField.appendChild(radioRow);
+
+        emojiInput = make("input", "bp-modal-input bp-modal-emoji-input");
+        emojiInput.type = "text";
+        emojiInput.maxLength = 16;
+        emojiInput.placeholder = "例: 📚";
+
+        iconUrlInput = make("input", "bp-modal-input");
+        iconUrlInput.type = "text";
+        iconUrlInput.inputMode = "url";
+        iconUrlInput.maxLength = 2000;
+        iconUrlInput.placeholder = "例: https://example.com/icon.png";
+
+        const initialType = card?.iconType || "default";
+        radios[initialType in radios ? initialType : "default"].checked = true;
+        if (initialType === "emoji") emojiInput.value = card.iconValue || "";
+        if (initialType === "url") iconUrlInput.value = card.iconValue || "";
+
+        iconField.append(emojiInput, iconUrlInput);
+        modalForm.appendChild(iconField);
+
+        const previewField = make("div", "bp-modal-field");
+        previewField.appendChild(make("span", "bp-modal-label", "プレビュー"));
+        previewCard = make("div", "bp-preview-card");
+        previewField.appendChild(previewCard);
+        modalForm.appendChild(previewField);
+      },
+      onSubmit({ errorEl: errEl, closeModal: closeFn }) {
+        const title = titleInput.value.trim();
+        const url = normalizeUrl(urlInput.value);
+        const iconType = getIconType();
+        const iconValue = getIconValue(iconType);
+
+        let error = "";
+        let focusTarget = null;
+        if (!title) [error, focusTarget] = ["タイトルを入力してください。", titleInput];
+        else if (!url) [error, focusTarget] = ["有効なURL（http:// または https://）を入力してください。", urlInput];
+        else if (iconType === "emoji" && !iconValue) [error, focusTarget] = ["絵文字を入力してください。", emojiInput];
+        else if (iconType === "url" && !normalizeUrl(iconValue)) [error, focusTarget] = ["有効な画像URL（http:// または https://）を入力してください。", iconUrlInput];
+        if (error) {
+          errEl.textContent = error;
+          focusTarget.focus();
+          return;
+        }
+
+        closeFn();
+        onSave({
+          title,
+          url,
+          iconType,
+          iconValue: iconType === "url" ? normalizeUrl(iconValue) : iconValue,
+        });
+      },
+    });
 
     form.addEventListener("input", () => {
       errorEl.textContent = "";
       updatePreview();
     });
     form.addEventListener("change", updatePreview);
-
-    form.addEventListener("submit", (e) => {
-      e.preventDefault();
-      const title = titleInput.value.trim();
-      const url = normalizeUrl(urlInput.value);
-      const iconType = getIconType();
-      const iconValue = getIconValue(iconType);
-
-      let error = "";
-      let focusTarget = null;
-      if (!title) [error, focusTarget] = ["タイトルを入力してください。", titleInput];
-      else if (!url) [error, focusTarget] = ["有効なURL（http:// または https://）を入力してください。", urlInput];
-      else if (iconType === "emoji" && !iconValue) [error, focusTarget] = ["絵文字を入力してください。", emojiInput];
-      else if (iconType === "url" && !normalizeUrl(iconValue)) [error, focusTarget] = ["有効な画像URL（http:// または https://）を入力してください。", iconUrlInput];
-      if (error) {
-        errorEl.textContent = error;
-        focusTarget.focus();
-        return;
-      }
-
-      closeCardModal();
-      onSave({
-        title,
-        url,
-        iconType,
-        iconValue: iconType === "url" ? normalizeUrl(iconValue) : iconValue,
-      });
-    });
-
-    cancelBtn.addEventListener("click", closeCardModal);
-    backdrop.addEventListener("mousedown", (e) => {
-      if (e.target === backdrop) closeCardModal();
-    });
-    const onKeydown = (e) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        e.stopPropagation();
-        closeCardModal();
-      } else if (e.key === "Tab") {
-        const focusables = Array.from(
-          dialog.querySelectorAll(
-            'button:not([disabled]), input:not([disabled]):not([hidden]), [tabindex]:not([tabindex="-1"])'
-          )
-        ).filter((el) => el.offsetParent !== null);
-        if (focusables.length === 0) return;
-        const first = focusables[0];
-        const last = focusables[focusables.length - 1];
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
-    };
-    document.addEventListener("keydown", onKeydown, true);
-
-    dialog.appendChild(form);
-    backdrop.appendChild(dialog);
-    document.body.appendChild(backdrop);
-    activeModal = { backdrop, onKeydown };
 
     updatePreview();
     titleInput.focus();
@@ -487,7 +668,7 @@
       openCardModal(null, (data) => {
         const card = { id: generateCustomCardId(), ...data };
         settings.customCards.push(card);
-        settings.order.push(CUSTOM_ID_PREFIX + card.id);
+        settings.order.push(CONSTANTS.CUSTOM_ID_PREFIX + card.id);
         saveSettings(settings);
         onUpdate();
       });
@@ -497,52 +678,8 @@
     return col;
   }
 
-  function isM365Card(el) {
-    if (el.classList.contains("bp-custom-card")) return false;
-    const spanText = el.querySelector("span")?.textContent?.trim();
-    if (spanText === "Microsoft365") return true;
-    const onclick = el.querySelector("a.service-thumb")?.getAttribute("onclick") || "";
-    return onclick.includes("login.microsoftonline.com");
-  }
-
-  function buildM365Onclick(originalOnclick, inputUrl) {
-    let trimmed = inputUrl.trim();
-    if (!trimmed || !originalOnclick) return originalOnclick;
-    if (!/^https?:\/\//i.test(trimmed)) {
-      trimmed = "https://" + trimmed;
-    }
-    if (/^https?:\/\/login\.microsoftonline\.com\//i.test(trimmed) || !/[?&]wreply=/i.test(originalOnclick)) {
-      const escaped = trimmed.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
-      return originalOnclick.replace(/https?:\/\/[^'"]+/i, () => escaped);
-    }
-    return originalOnclick.replace(/([?&]wreply=)[^'&"]+/i, (_match, p1) => p1 + encodeURIComponent(trimmed));
-  }
-
-  function applyM365Redirect(el, settings) {
-    if (!isM365Card(el)) return;
-    const link = el.querySelector("a.service-thumb");
-    if (!link) return;
-
-    if (!("bpOriginalOnclick" in link.dataset)) {
-      link.dataset.bpOriginalOnclick = link.getAttribute("onclick") || "";
-    }
-
-    const originalOnclick = link.dataset.bpOriginalOnclick;
-    if (!originalOnclick) return;
-
-    const customUrl = settings.m365RedirectUrl?.trim();
-    const targetOnclick = customUrl
-      ? buildM365Onclick(originalOnclick, customUrl)
-      : originalOnclick;
-
-    if (link.getAttribute("onclick") !== targetOnclick) {
-      link.dataset.bpOnclick = targetOnclick;
-      link.dispatchEvent(new CustomEvent("bp-onclick-change", { bubbles: true }));
-    }
-  }
-
   function getAllServiceCards() {
-    return [...document.querySelectorAll('[id^="div-"][class*="col-"]:has(.service-thumb-wrap)')];
+    return [...document.querySelectorAll(CONSTANTS.SELECTOR.SERVICE_CARDS)];
   }
 
   function createButton(className, text, onClick) {
@@ -559,8 +696,11 @@
     return btn;
   }
 
+  /* =====================================================================
+   * トグル要素コントローラ (Toggle Controller)
+   * ===================================================================== */
   function applyExtraHides(settings) {
-    if (document.body.classList.contains("bp-edit-mode")) return;
+    if (document.body.classList.contains(CONSTANTS.CLASSES.EDIT_MODE)) return;
     for (const cfg of TOGGLE_CONFIG) {
       const el = cfg.find();
       if (!el) continue;
@@ -569,11 +709,11 @@
     }
   }
 
-  function createOverlay(targetEl, cfg, settings, onUpdate) {
-    targetEl.querySelector(".bp-toggle-overlay")?.remove();
+  function createToggleOverlay(targetEl, cfg, settings, onUpdate) {
+    targetEl.querySelector("." + CONSTANTS.CLASSES.TOGGLE_OVERLAY)?.remove();
 
     const wrapper = document.createElement("div");
-    wrapper.className = "bp-toggle-overlay";
+    wrapper.className = CONSTANTS.CLASSES.TOGGLE_OVERLAY;
 
     const isActive = settings[cfg.key];
     wrapper.appendChild(createButton(
@@ -599,12 +739,12 @@
       if (!el) continue;
       if (cfg.revert) cfg.revert(el, settings[cfg.key]);
       else if (settings[cfg.key]) el.style.display = "";
-      createOverlay(el, cfg, settings, onUpdate);
+      createToggleOverlay(el, cfg, settings, onUpdate);
     }
   }
 
   function cleanupTogglableElements(settings) {
-    document.querySelectorAll(".bp-toggle-overlay").forEach((el) => {
+    document.querySelectorAll("." + CONSTANTS.CLASSES.TOGGLE_OVERLAY).forEach((el) => {
       const parent = el.parentElement;
       if (parent && "bpPrevPosition" in parent.dataset) {
         parent.style.position = parent.dataset.bpPrevPosition;
@@ -616,16 +756,19 @@
   }
 
   function findServiceRow() {
-    return document.querySelector('.row:has([id^="div-"][class*="col-"] .service-thumb-wrap)');
+    return document.querySelector(CONSTANTS.SELECTOR.SERVICE_ROW);
   }
 
+  /* =====================================================================
+   * カード編集オーバーレイ生成
+   * ===================================================================== */
   function createEditOverlay(el, settings, onUpdate) {
     const overlay = document.createElement("div");
-    overlay.className = "bp-edit-overlay";
+    overlay.className = CONSTANTS.CLASSES.EDIT_OVERLAY;
 
     const id = el.id;
     const isHidden = settings.hiddenIds.includes(id);
-    const customCard = el.classList.contains("bp-custom-card") ? findCustomCard(settings, id) : null;
+    const customCard = el.classList.contains(CONSTANTS.CLASSES.CUSTOM_CARD) ? findCustomCard(settings, id) : null;
 
     const createCustomCardButtons = () => {
       const row = document.createElement("div");
@@ -663,14 +806,22 @@
       moveRow.className = "bp-move-row";
 
       const upBtn = createButton("bp-btn-up", "▲", () => {
-        moveCard(id, -1, settings);
-        onUpdate();
+        const newOrder = OrderLogic.calcMoveOrder(settings.order, settings.hiddenIds, id, -1);
+        if (newOrder) {
+          settings.order = newOrder;
+          saveSettings(settings);
+          onUpdate();
+        }
       });
       upBtn.title = "上に移動";
 
       const downBtn = createButton("bp-btn-down", "▼", () => {
-        moveCard(id, 1, settings);
-        onUpdate();
+        const newOrder = OrderLogic.calcMoveOrder(settings.order, settings.hiddenIds, id, 1);
+        if (newOrder) {
+          settings.order = newOrder;
+          saveSettings(settings);
+          onUpdate();
+        }
       });
       downBtn.title = "下に移動";
 
@@ -686,24 +837,11 @@
           "bp-btn-link",
           hasCustomUrl ? "リンク先変更 (設定済)" : "リンク先を変更",
           () => {
-            const input = prompt(
-              "Microsoft365のリダイレクト先URLを入力してください（空欄でデフォルトに戻す）\n例: https://doshishaacjp-my.sharepoint.com/my",
-              settings.m365RedirectUrl || ""
-            );
-            if (input === null) return;
-            const trimmed = input.trim();
-            if (!trimmed) {
-              settings.m365RedirectUrl = "";
-            } else {
-              const validated = normalizeUrl(trimmed);
-              if (!validated) {
-                alert("有効なURL（http:// または https://）を入力してください。");
-                return;
-              }
-              settings.m365RedirectUrl = validated;
-            }
-            saveSettings(settings);
-            onUpdate();
+            openM365UrlModal(settings.m365RedirectUrl || "", (newUrl) => {
+              settings.m365RedirectUrl = newUrl;
+              saveSettings(settings);
+              onUpdate();
+            });
           }
         );
         if (hasCustomUrl) {
@@ -716,66 +854,30 @@
     return overlay;
   }
 
-  function moveCard(cardId, direction, settings) {
-    const order = settings.order;
-    const idx = order.indexOf(cardId);
-    if (idx < 0) return;
-
-    const visibleOrder = order.filter((id) => !settings.hiddenIds.includes(id));
-    const visibleIdx = visibleOrder.indexOf(cardId);
-    if (visibleIdx < 0) return;
-
-    const newVisibleIdx = visibleIdx + direction;
-    if (newVisibleIdx < 0 || newVisibleIdx >= visibleOrder.length) return;
-
-    const swapId = visibleOrder[newVisibleIdx];
-    const swapIdx = order.indexOf(swapId);
-    order[idx] = swapId;
-    order[swapIdx] = cardId;
-
-    settings.order = order;
-    saveSettings(settings);
-  }
-
-  function reorderByDrag(draggedId, targetId, insertBefore, settings) {
-    const order = settings.order.slice();
-    const dragIdx = order.indexOf(draggedId);
-    if (dragIdx < 0) return;
-
-    order.splice(dragIdx, 1);
-
-    let targetIdx = order.indexOf(targetId);
-    if (targetIdx < 0) return;
-
-    if (!insertBefore) targetIdx++;
-
-    order.splice(targetIdx, 0, draggedId);
-
-    settings.order = order;
-    saveSettings(settings);
-  }
-
+  /* =====================================================================
+   * ドラッグ＆ドロップコントローラ (Drag and Drop Controller)
+   * ===================================================================== */
   function clearDropIndicators() {
-    mainRow?.querySelectorAll(".bp-drop-before, .bp-drop-after")
-      .forEach((el) => el.classList.remove("bp-drop-before", "bp-drop-after"));
+    mainRow?.querySelectorAll("." + CONSTANTS.CLASSES.DROP_BEFORE + ", ." + CONSTANTS.CLASSES.DROP_AFTER)
+      .forEach((el) => el.classList.remove(CONSTANTS.CLASSES.DROP_BEFORE, CONSTANTS.CLASSES.DROP_AFTER));
   }
 
   function initDragAndDrop(settings) {
     mainRow.addEventListener("dragstart", (e) => {
-      const card = e.target.closest(".bp-service-card");
-      if (!card || !document.body.classList.contains("bp-edit-mode")) {
+      const card = e.target.closest("." + CONSTANTS.CLASSES.SERVICE_CARD);
+      if (!card || !document.body.classList.contains(CONSTANTS.CLASSES.EDIT_MODE)) {
         e.preventDefault();
         return;
       }
       draggedCardId = card.id;
       e.dataTransfer.effectAllowed = "move";
       e.dataTransfer.setData("text/plain", card.id);
-      requestAnimationFrame(() => card.classList.add("bp-dragging"));
+      requestAnimationFrame(() => card.classList.add(CONSTANTS.CLASSES.DRAGGING));
     });
 
     mainRow.addEventListener("dragend", (e) => {
-      const card = e.target.closest(".bp-service-card");
-      if (card) card.classList.remove("bp-dragging");
+      const card = e.target.closest("." + CONSTANTS.CLASSES.SERVICE_CARD);
+      if (card) card.classList.remove(CONSTANTS.CLASSES.DRAGGING);
       clearDropIndicators();
       draggedCardId = null;
     });
@@ -785,31 +887,36 @@
       e.preventDefault();
       e.dataTransfer.dropEffect = "move";
 
-      const card = e.target.closest(".bp-service-card");
+      const card = e.target.closest("." + CONSTANTS.CLASSES.SERVICE_CARD);
       if (!card || draggedCardId === card.id) return;
 
       clearDropIndicators();
       const rect = card.getBoundingClientRect();
       const midX = rect.left + rect.width / 2;
-      card.classList.add(e.clientX < midX ? "bp-drop-before" : "bp-drop-after");
+      card.classList.add(e.clientX < midX ? CONSTANTS.CLASSES.DROP_BEFORE : CONSTANTS.CLASSES.DROP_AFTER);
     });
 
     mainRow.addEventListener("dragleave", (e) => {
-      const card = e.target.closest(".bp-service-card");
-      if (card) card.classList.remove("bp-drop-before", "bp-drop-after");
+      const card = e.target.closest("." + CONSTANTS.CLASSES.SERVICE_CARD);
+      if (card) card.classList.remove(CONSTANTS.CLASSES.DROP_BEFORE, CONSTANTS.CLASSES.DROP_AFTER);
     });
 
     mainRow.addEventListener("drop", (e) => {
       if (!draggedCardId) return;
       e.preventDefault();
 
-      const card = e.target.closest(".bp-service-card");
+      const card = e.target.closest("." + CONSTANTS.CLASSES.SERVICE_CARD);
       const shouldReorder = card && draggedCardId !== card.id;
 
       if (shouldReorder) {
         const rect = card.getBoundingClientRect();
         const midX = rect.left + rect.width / 2;
-        reorderByDrag(draggedCardId, card.id, e.clientX < midX, settings);
+        const insertBefore = e.clientX < midX;
+        const newOrder = OrderLogic.calcDragReorder(settings.order, draggedCardId, card.id, insertBefore);
+        if (newOrder) {
+          settings.order = newOrder;
+          saveSettings(settings);
+        }
       }
 
       clearDropIndicators();
@@ -818,6 +925,9 @@
     });
   }
 
+  /* =====================================================================
+   * 非表示セクション生成
+   * ===================================================================== */
   function createHiddenSection(count) {
     const section = document.createElement("div");
     section.className = "bp-hidden-section" + (hiddenSectionOpen ? " open" : "");
@@ -847,6 +957,9 @@
     return { section, body };
   }
 
+  /* =====================================================================
+   * レイアウト・編集モード・アプリケーション統合 (PortalApp)
+   * ===================================================================== */
   function applyLayout(settings) {
     const portalCards = getAllServiceCards();
     if (mainRow && portalCards.length > 0) {
@@ -867,8 +980,8 @@
       mainRow.parentElement.querySelector(".bp-hidden-section")?.remove();
 
       for (const el of allCards) {
-        el.querySelector(".bp-edit-overlay")?.remove();
-        el.classList.remove("bp-hidden-item");
+        el.querySelector("." + CONSTANTS.CLASSES.EDIT_OVERLAY)?.remove();
+        el.classList.remove(CONSTANTS.CLASSES.HIDDEN_ITEM);
         el.removeAttribute("draggable");
         applyM365Redirect(el, settings);
       }
@@ -881,7 +994,7 @@
       for (const id of settings.order) {
         const el = cardById.get(id);
         if (!el || hiddenSet.has(id)) continue;
-        el.classList.add("bp-service-card");
+        el.classList.add(CONSTANTS.CLASSES.SERVICE_CARD);
         el.setAttribute("draggable", "true");
         el.appendChild(createEditOverlay(el, settings, onUpdate));
         mainRow.appendChild(el);
@@ -894,7 +1007,7 @@
         const { section, body } = createHiddenSection(hiddenCards.length);
         for (const id of hiddenCards) {
           const el = cardById.get(id);
-          el.classList.add("bp-service-card", "bp-hidden-item");
+          el.classList.add(CONSTANTS.CLASSES.SERVICE_CARD, CONSTANTS.CLASSES.HIDDEN_ITEM);
           el.appendChild(createEditOverlay(el, settings, onUpdate));
           body.appendChild(el);
         }
@@ -907,6 +1020,7 @@
 
   function createSettingsButton(settings) {
     const btn = document.createElement("button");
+    btn.type = "button";
     btn.className = "bp-settings-btn";
     btn.textContent = "⚙";
     btn.title = "ポータルを編集";
@@ -915,16 +1029,17 @@
 
     const onUpdate = () => {
       applyLayout(settings);
-      if (document.body.classList.contains("bp-edit-mode")) {
+      if (document.body.classList.contains(CONSTANTS.CLASSES.EDIT_MODE)) {
         setupTogglableElements(settings, onUpdate);
       }
     };
 
     function enterEditMode() {
-      document.body.classList.add("bp-edit-mode");
+      document.body.classList.add(CONSTANTS.CLASSES.EDIT_MODE);
       btn.classList.add("active");
 
       resetBtn = document.createElement("button");
+      resetBtn.type = "button";
       resetBtn.className = "bp-reset-btn";
       resetBtn.textContent = "設定をリセット";
       resetBtn.addEventListener("click", () => {
@@ -944,8 +1059,8 @@
     }
 
     function exitEditMode() {
-      closeCardModal();
-      document.body.classList.remove("bp-edit-mode");
+      closeModal();
+      document.body.classList.remove(CONSTANTS.CLASSES.EDIT_MODE);
       btn.classList.remove("active");
       if (resetBtn) {
         resetBtn.remove();
@@ -955,7 +1070,7 @@
     }
 
     btn.addEventListener("click", () => {
-      if (document.body.classList.contains("bp-edit-mode")) {
+      if (document.body.classList.contains(CONSTANTS.CLASSES.EDIT_MODE)) {
         exitEditMode();
       } else {
         enterEditMode();
@@ -968,7 +1083,7 @@
   async function init() {
     // 万一の初期化エラー時にも最長2秒で必ずページを表示状態にするセーフティタイマー（FOUC対策のフェイルセーフ）
     const safetyTimer = setTimeout(() => {
-      document.body?.classList.add("bp-ready");
+      document.body?.classList.add(CONSTANTS.CLASSES.READY);
     }, 2000);
 
     try {
@@ -988,7 +1103,7 @@
       console.error("[Better Portal] Failed to initialize portal customizer:", err);
     } finally {
       clearTimeout(safetyTimer);
-      document.body?.classList.add("bp-ready");
+      document.body?.classList.add(CONSTANTS.CLASSES.READY);
     }
   }
 

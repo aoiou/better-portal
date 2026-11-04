@@ -21,6 +21,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   const LOGIN_URL = 'https://doshisha.ex-tic.com/auth/session';
+  const DEBOUNCE_DELAY = 1000;
+  const FEEDBACK_DURATION = 1800;
 
   const usernameInput = document.getElementById('username-input');
   const clearBtn = document.getElementById('clear-btn');
@@ -133,7 +135,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // 入力欄の保存完了フィードバック演出（枠線の緑発光 & ✓アイコン）
-  function showSaveFeedback(duration = 1800) {
+  function showSaveFeedback(duration = FEEDBACK_DURATION) {
     if (feedbackTimeout) {
       clearTimeout(feedbackTimeout);
     }
@@ -229,7 +231,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // 入力停止検知（デバウンス保存: 1000ms）
+  // 入力停止検知（デバウンス保存）
   function triggerDebouncedSave() {
     updateClearButton();
     if (debounceTimeout) {
@@ -237,12 +239,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     debounceTimeout = setTimeout(() => {
       saveSettings({ showFeedback: true });
-    }, 1000);
+    }, DEBOUNCE_DELAY);
   }
 
   // イベントリスナー登録
 
-  // 1. 入力中：クリアボタン表示切替 ＆ デバウンス保存（1000ms）
+  // 1. 入力中：クリアボタン表示切替 ＆ デバウンス保存
   usernameInput.addEventListener('input', triggerDebouncedSave);
 
   // 2. フォーカスが外れた時（blur）：即時保存
@@ -250,12 +252,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     saveSettings({ showFeedback: true });
   });
 
-  // 3. Enterキー：即時保存してフォーカスを外す（日本語IME変換確定時は除外）
+  // 3. Enterキー：フォーカスを外して即時保存を誘発（日本語IME変換確定時は除外）
   usernameInput.addEventListener('keydown', (e) => {
     if (e.isComposing || e.keyCode === 229) return;
     if (e.key === 'Enter') {
       e.preventDefault();
-      saveSettings({ showFeedback: true });
       usernameInput.blur();
     }
   });
