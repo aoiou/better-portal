@@ -176,9 +176,12 @@
     const link = el.querySelector("a.service-thumb");
     if (!link) return null;
     for (const key of Object.keys(link.dataset)) delete link.dataset[key];
-    link.removeAttribute("target");
+    link.removeAttribute("onclick");
+    link.onclick = null;
     link.href = card.url;
     link.title = card.url;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
 
     const icon = createIconElement(card.iconType, card.iconValue);
     const oldIcon = link.querySelector(".service-thumb-img");
@@ -193,13 +196,16 @@
     label.textContent = card.title;
 
     link.addEventListener("click", (e) => {
-      // Ctrl/Shift/中クリック等はブラウザ標準動作（href）に任せる
-      if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
-      e.preventDefault();
-      if (document.body.classList.contains("bp-edit-mode")) return;
-      // MAIN ワールド（portal-page.js）でポータル標準の doPortal(url) を呼び出す
-      link.dataset.bpOpenUrl = card.url;
-      link.dispatchEvent(new CustomEvent("bp-open-card", { bubbles: true }));
+      // 編集モード中はリンク遷移を無効化する
+      if (document.body.classList.contains("bp-edit-mode")) {
+        e.preventDefault();
+      }
+    });
+    link.addEventListener("auxclick", (e) => {
+      // 編集モード中は中クリック等によるリンク遷移も無効化する
+      if (document.body.classList.contains("bp-edit-mode")) {
+        e.preventDefault();
+      }
     });
 
     return el;
