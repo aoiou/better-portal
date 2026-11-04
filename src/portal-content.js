@@ -195,21 +195,30 @@
     }
     label.textContent = card.title;
 
-    link.addEventListener("click", (e) => {
-      // 編集モード中はリンク遷移を無効化する
-      if (document.body.classList.contains("bp-edit-mode")) {
-        e.preventDefault();
-      }
-    });
-    link.addEventListener("auxclick", (e) => {
-      // 編集モード中は中クリック等によるリンク遷移も無効化する
-      if (document.body.classList.contains("bp-edit-mode")) {
-        e.preventDefault();
-      }
-    });
-
+    // クリック処理は window キャプチャフェーズの guardCustomCardClick で一括して行う
     return el;
   }
+
+  // オリジナルカードのリンククリックをポータル側スクリプトから隔離する。
+  // ポータルはカード（a.service-thumb 等）へのクリックを委譲ハンドラで拾い、
+  // 独自のリダイレクト処理（doPortal 相当）に回すことがある（Chromium 系で発生）。
+  // その場合 URL 指定が無いためフォールバック先へ飛ばされてしまうので、
+  // document_start 時点で window のキャプチャフェーズに登録し、ページ側のどのハンドラよりも先に
+  // 伝播を止める。preventDefault はしないため、href / target="_blank" による標準遷移はそのまま行われる。
+  function guardCustomCardClick(e) {
+    const target = e.target instanceof Element ? e.target : e.target?.parentElement;
+    if (!target) return;
+    if (target.closest(".bp-edit-overlay")) return;
+    const link = target.closest(".bp-custom-card a.service-thumb");
+    if (!link) return;
+    e.stopImmediatePropagation();
+    // 編集モード中はリンク遷移（中クリック等を含む）を無効化する
+    if (document.body.classList.contains("bp-edit-mode")) {
+      e.preventDefault();
+    }
+  }
+  window.addEventListener("click", guardCustomCardClick, true);
+  window.addEventListener("auxclick", guardCustomCardClick, true);
 
   function deleteCustomCard(settings, elementId, onUpdate) {
     const card = findCustomCard(settings, elementId);
