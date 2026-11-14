@@ -23,6 +23,7 @@
       NOTICE_FOOTER: "bp-notice-footer",
       NOTICE_READ: "bp-notice-read",
       NOTICE_UNREAD: "bp-notice-unread",
+      NOTICE_BOTTOM: "bp-notice-bottom",
       NOTICE_BLOCK_READ: "bp-notice-block--read",
       NOTICE_BLOCK_FOLDED: "bp-notice-block--folded",
       NOTICE_FOLD_BAR: "bp-notice-fold-bar",
@@ -65,10 +66,12 @@
           anchor.hidden = true;
           el.before(anchor);
         }
+        el.classList.toggle(CONSTANTS.CLASSES.NOTICE_BOTTOM, Boolean(active));
         if (active) document.getElementById("div-container")?.appendChild(el);
         else document.getElementById("bp-notice-anchor")?.after(el);
       },
       revert(el, active) {
+        el.classList.remove(CONSTANTS.CLASSES.NOTICE_BOTTOM);
         if (active) document.getElementById("bp-notice-anchor")?.after(el);
       },
     },

@@ -539,6 +539,12 @@ body.bp-edit-mode .bp-add-card-col {
   border-radius: var(--bs-card-inner-border-radius, 0.375rem);
 }
 
+/* お知らせを最下部へ移動した際、直下のフッターと密着しないよう余白を確保 */
+#PortalComment02.bp-notice-bottom,
+#div-container > #PortalComment02:last-child {
+  margin-bottom: 2em;
+}
+
 /* 編集モード時、折りたたみ中でも「お知らせを一番下に移動」オーバーレイが収まる高さを確保 */
 body.bp-edit-mode #PortalComment02 {
   min-height: 54px;
