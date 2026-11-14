@@ -457,6 +457,10 @@
     LOGIN_SRF: "login_srf",
     DOMAIN_HINT: "domain_hint",
   };
+  const M365_METHOD_LABELS = {
+    [M365_REDIRECT_METHODS.DOMAIN_HINT]: "新方式",
+    [M365_REDIRECT_METHODS.LOGIN_SRF]: "旧方式",
+  };
   const M365_DOMAIN_HINT = "mail.doshisha.ac.jp";
   const M365_CUSTOM_OPTION_ID = "custom";
   const M365_REDIRECT_PRESETS = [
@@ -473,7 +477,7 @@
       description: "大学のOneDriveを開く",
       url: "https://doshishaacjp-my.sharepoint.com/my",
       method: M365_REDIRECT_METHODS.LOGIN_SRF,
-      badge: "旧方式",
+      badge: M365_METHOD_LABELS[M365_REDIRECT_METHODS.LOGIN_SRF],
     },
     {
       id: "outlook",
@@ -481,14 +485,14 @@
       variants: [
         {
           id: M365_REDIRECT_METHODS.DOMAIN_HINT,
-          label: "新方式",
+          label: M365_METHOD_LABELS[M365_REDIRECT_METHODS.DOMAIN_HINT],
           description: "ヒントをつけてOutlookを開く",
           url: "https://outlook.cloud.microsoft/mail/",
           method: M365_REDIRECT_METHODS.DOMAIN_HINT,
         },
         {
           id: M365_REDIRECT_METHODS.LOGIN_SRF,
-          label: "旧方式",
+          label: M365_METHOD_LABELS[M365_REDIRECT_METHODS.LOGIN_SRF],
           description: "ポータル経由でOutlookを開く",
           url: "https://outlook.office.com/mail/",
           method: M365_REDIRECT_METHODS.LOGIN_SRF,
@@ -499,12 +503,12 @@
   const M365_METHOD_OPTIONS = [
     {
       id: M365_REDIRECT_METHODS.DOMAIN_HINT,
-      label: "新方式",
+      label: M365_METHOD_LABELS[M365_REDIRECT_METHODS.DOMAIN_HINT],
       description: "ヒントをつけて開く",
     },
     {
       id: M365_REDIRECT_METHODS.LOGIN_SRF,
-      label: "旧方式",
+      label: M365_METHOD_LABELS[M365_REDIRECT_METHODS.LOGIN_SRF],
       description: "ポータル経由で開く",
     },
   ];
@@ -647,6 +651,10 @@
     return el;
   }
 
+  function getCheckedRadioValue(radiosMap, fallback) {
+    return Object.values(radiosMap).find((radio) => radio.checked)?.value || fallback;
+  }
+
   function closeModal() {
     if (!activeModal) return;
     document.removeEventListener("keydown", activeModal.onKeydown, true);
@@ -687,6 +695,12 @@
     saveBtn.type = "submit";
     actions.append(cancelBtn, saveBtn);
     form.appendChild(actions);
+
+    const clearError = () => {
+      errorEl.textContent = "";
+    };
+    form.addEventListener("input", clearError);
+    form.addEventListener("change", clearError);
 
     form.addEventListener("submit", (e) => {
       e.preventDefault();
@@ -737,7 +751,7 @@
     document.body.appendChild(backdrop);
     activeModal = { backdrop, onKeydown };
 
-    return { dialog, form, errorEl };
+    return { dialog, form };
   }
 
   function openM365UrlModal(currentUrl, currentMethod, onSave) {
@@ -757,11 +771,9 @@
     let customDescEl = null;
     let urlInput = null;
 
-    const getSelectedOptionId = () =>
-      Object.values(destRadios).find((radio) => radio.checked)?.value || "default";
+    const getSelectedOptionId = () => getCheckedRadioValue(destRadios, "default");
 
-    const getSelectedMethod = () =>
-      Object.values(methodRadios).find((radio) => radio.checked)?.value || M365_REDIRECT_METHODS.DOMAIN_HINT;
+    const getSelectedMethod = () => getCheckedRadioValue(methodRadios, M365_REDIRECT_METHODS.DOMAIN_HINT);
 
     const syncCustomSection = () => {
       const isCustom = getSelectedOptionId() === M365_CUSTOM_OPTION_ID;
@@ -795,9 +807,7 @@
       radiosMap[value] = radio;
 
       const body = createEl("span", "bp-modal-option-body");
-      const header = createEl("span", "bp-modal-option-header");
-      header.appendChild(createEl("span", "bp-modal-option-title", title));
-      body.appendChild(header);
+      body.appendChild(createEl("span", "bp-modal-option-title", title));
 
       const initialVariant = Array.isArray(variants)
         ? (variants.find((v) => v.id === initialVariantId) || variants[0])
@@ -865,7 +875,7 @@
       return field;
     };
 
-    const { form, errorEl } = createModalFrame({
+    const { form } = createModalFrame({
       title: "Microsoft365のリンク先設定",
       ariaLabel: "Microsoft365のリンク先を設定",
       submitText: "保存",
@@ -984,13 +994,7 @@
       },
     });
 
-    form.addEventListener("input", () => {
-      errorEl.textContent = "";
-    });
-    form.addEventListener("change", () => {
-      errorEl.textContent = "";
-      syncCustomSection();
-    });
+    form.addEventListener("change", syncCustomSection);
 
     if (initialOptionId === M365_CUSTOM_OPTION_ID) {
       urlInput?.focus();
@@ -1012,27 +1016,33 @@
     return settings.customCards.find((c) => c.id === id) || null;
   }
 
-  function createDefaultIconSvg() {
+  function createStrokeIconSvg(paths, { className = "", strokeWidth = "1.8" } = {}) {
     const svg = document.createElementNS(CONSTANTS.SVG_NS, "svg");
     svg.setAttribute("viewBox", "0 0 24 24");
-    svg.setAttribute("class", "bp-card-default-icon");
+    if (className) svg.setAttribute("class", className);
     svg.setAttribute("aria-hidden", "true");
-    const paths = [
-      "M12 2a10 10 0 1 0 0 20a10 10 0 1 0 0-20z",
-      "M2 12h20",
-      "M12 2a15 15 0 0 1 4 10a15 15 0 0 1-4 10a15 15 0 0 1-4-10a15 15 0 0 1 4-10z",
-    ];
     for (const d of paths) {
       const path = document.createElementNS(CONSTANTS.SVG_NS, "path");
       path.setAttribute("d", d);
       path.setAttribute("fill", "none");
       path.setAttribute("stroke", "currentColor");
-      path.setAttribute("stroke-width", "1.6");
+      path.setAttribute("stroke-width", strokeWidth);
       path.setAttribute("stroke-linecap", "round");
       path.setAttribute("stroke-linejoin", "round");
       svg.appendChild(path);
     }
     return svg;
+  }
+
+  function createDefaultIconSvg() {
+    return createStrokeIconSvg(
+      [
+        "M12 2a10 10 0 1 0 0 20a10 10 0 1 0 0-20z",
+        "M2 12h20",
+        "M12 2a15 15 0 0 1 4 10a15 15 0 0 1-4 10a15 15 0 0 1-4-10a15 15 0 0 1 4-10z",
+      ],
+      { className: "bp-card-default-icon", strokeWidth: "1.6" }
+    );
   }
 
   function createIconElement(iconType, iconValue, forPreview = false) {
@@ -1055,17 +1065,22 @@
     return wrap;
   }
 
-  function createCardTemplate(sourceCard) {
-    const tpl = sourceCard.cloneNode(true);
-    tpl.querySelectorAll("." + CONSTANTS.CLASSES.EDIT_OVERLAY + ", ." + CONSTANTS.CLASSES.DROP_SLOT).forEach((el) => el.remove());
-    tpl.classList.remove(
-      CONSTANTS.CLASSES.SERVICE_CARD,
+  function stripCardEditState(el, { stripServiceClass = false } = {}) {
+    el
+      .querySelectorAll("." + CONSTANTS.CLASSES.EDIT_OVERLAY + ", ." + CONSTANTS.CLASSES.DROP_SLOT)
+      .forEach((n) => n.remove());
+    el.classList.remove(
       CONSTANTS.CLASSES.HIDDEN_ITEM,
       CONSTANTS.CLASSES.DRAG_PLACEHOLDER,
       CONSTANTS.CLASSES.DRAG_SETTLING
     );
-    delete tpl.dataset.bpDraggable;
-    tpl.removeAttribute("draggable");
+    if (stripServiceClass) el.classList.remove(CONSTANTS.CLASSES.SERVICE_CARD);
+    delete el.dataset.bpDraggable;
+  }
+
+  function createCardTemplate(sourceCard) {
+    const tpl = sourceCard.cloneNode(true);
+    stripCardEditState(tpl, { stripServiceClass: true });
     tpl.removeAttribute("style");
     return tpl;
   }
@@ -1134,7 +1149,7 @@
     const radios = {};
     const radioName = "bp-icon-type-" + generateCustomCardId();
 
-    const getIconType = () => Object.values(radios).find((r) => r.checked)?.value || "default";
+    const getIconType = () => getCheckedRadioValue(radios, "default");
     const getIconValue = (type) =>
       type === "emoji" ? emojiInput.value.trim() : type === "url" ? iconUrlInput.value.trim() : "";
 
@@ -1154,9 +1169,8 @@
       );
     }
 
-    const { form, errorEl } = createModalFrame({
+    const { form } = createModalFrame({
       title: card ? "オリジナルカードを編集" : "オリジナルカードを追加",
-      ariaLabel: card ? "オリジナルカードを編集" : "オリジナルカードを追加",
       submitText: card ? "保存" : "追加",
       onRenderBody({ form: modalForm, makeField }) {
         titleInput = createEl("input", "bp-modal-input");
@@ -1244,10 +1258,7 @@
       },
     });
 
-    form.addEventListener("input", () => {
-      errorEl.textContent = "";
-      updatePreview();
-    });
+    form.addEventListener("input", updatePreview);
     form.addEventListener("change", updatePreview);
 
     updatePreview();
@@ -1260,7 +1271,6 @@
 
     const btn = createEl("button", "bp-add-card-btn");
     btn.type = "button";
-    btn.draggable = false;
     btn.append(
       createEl("span", "bp-add-card-plus", "＋"),
       createEl("span", "bp-add-card-label", "新規カードを追加")
@@ -1288,7 +1298,6 @@
   function createButton(className, text, onClick) {
     const btn = createEl("button", "bp-btn " + className, text);
     btn.type = "button";
-    btn.draggable = false;
     btn.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -1437,15 +1446,9 @@
           }
         );
         if (hasCustomUrl) {
-          if (match?.variant) {
-            linkBtn.title = `現在の設定: ${match.preset.label}（${match.variant.label}）`;
-          } else if (match) {
-            linkBtn.title = `現在の設定: ${match.preset.label}`;
-          } else if (currentMethod === M365_REDIRECT_METHODS.DOMAIN_HINT) {
-            linkBtn.title = `現在の設定（新方式）: ${currentUrl}`;
-          } else {
-            linkBtn.title = `現在の設定（旧方式）: ${currentUrl}`;
-          }
+          linkBtn.title = match
+            ? `現在の設定: ${match.preset.label}${match.variant ? `（${match.variant.label}）` : ""}`
+            : `現在の設定（${M365_METHOD_LABELS[currentMethod]}）: ${currentUrl}`;
         }
         overlay.appendChild(linkBtn);
       }
@@ -1462,40 +1465,18 @@
     slot.setAttribute("aria-hidden", "true");
 
     const iconWrap = createEl("div", CONSTANTS.CLASSES.DROP_SLOT_ICON);
-    const svg = document.createElementNS(CONSTANTS.SVG_NS, "svg");
-    svg.setAttribute("viewBox", "0 0 24 24");
-    svg.setAttribute("aria-hidden", "true");
-
-    for (const d of ["M12 5v10", "M8.5 11.5L12 15l3.5-3.5", "M5 19h14"]) {
-      const path = document.createElementNS(CONSTANTS.SVG_NS, "path");
-      path.setAttribute("d", d);
-      path.setAttribute("fill", "none");
-      path.setAttribute("stroke", "currentColor");
-      path.setAttribute("stroke-width", "1.8");
-      path.setAttribute("stroke-linecap", "round");
-      path.setAttribute("stroke-linejoin", "round");
-      svg.appendChild(path);
-    }
-
-    iconWrap.appendChild(svg);
+    iconWrap.appendChild(
+      createStrokeIconSvg(["M12 5v10", "M8.5 11.5L12 15l3.5-3.5", "M5 19h14"], { strokeWidth: "1.8" })
+    );
     slot.appendChild(iconWrap);
     return slot;
   }
 
   function createDragGhostElement(cardEl, rect) {
     const ghost = cardEl.cloneNode(true);
-    if (ghost.id) ghost.removeAttribute("id");
+    ghost.removeAttribute("id");
     ghost.querySelectorAll("[id]").forEach((n) => n.removeAttribute("id"));
-    ghost
-      .querySelectorAll("." + CONSTANTS.CLASSES.EDIT_OVERLAY + ", ." + CONSTANTS.CLASSES.DROP_SLOT)
-      .forEach((n) => n.remove());
-    ghost.removeAttribute("data-bp-draggable");
-    ghost.classList.remove(
-      CONSTANTS.CLASSES.SERVICE_CARD,
-      CONSTANTS.CLASSES.HIDDEN_ITEM,
-      CONSTANTS.CLASSES.DRAG_PLACEHOLDER,
-      CONSTANTS.CLASSES.DRAG_SETTLING
-    );
+    stripCardEditState(ghost, { stripServiceClass: true });
     ghost.classList.add(CONSTANTS.CLASSES.DRAG_GHOST);
     ghost.style.left = rect.left + "px";
     ghost.style.top = rect.top + "px";
@@ -1548,12 +1529,20 @@
         : null;
     }
 
-    function cacheLayoutRects(activeState) {
+    function isSameOrder(a, b) {
+      return a.length === b.length && a.every((id, idx) => id === b[idx]);
+    }
+
+    function cacheLayoutRects(activeState, cards = getVisibleCards(), viewportRects = null) {
       if (!mainRow || !activeState) return;
       const rowRect = mainRow.getBoundingClientRect();
       activeState.layoutRects.clear();
-      for (const card of getVisibleCards()) {
-        activeState.layoutRects.set(card, toRowRelativeRect(card.getBoundingClientRect(), rowRect));
+      for (const card of cards) {
+        const rect = card.getBoundingClientRect();
+        activeState.layoutRects.set(card, toRowRelativeRect(rect, rowRect));
+        if (viewportRects && card !== activeState.cardEl) {
+          viewportRects.set(card, rect);
+        }
       }
       activeState.addColRect = measureAddColRect(rowRect);
     }
@@ -1633,6 +1622,12 @@
     }
 
     function applyFlipReorder(activeState, applyDomChange) {
+      if (prefersReducedMotion()) {
+        applyDomChange();
+        cacheLayoutRects(activeState);
+        return;
+      }
+
       const prevCards = getVisibleCards();
       const firstRects = new Map();
       for (const card of prevCards) {
@@ -1651,24 +1646,8 @@
         }
       }
 
-      const rowRect = mainRow.getBoundingClientRect();
       const lastRects = new Map();
-      activeState.layoutRects.clear();
-      for (const card of nextCards) {
-        const r = card.getBoundingClientRect();
-        activeState.layoutRects.set(card, toRowRelativeRect(r, rowRect));
-        if (card !== activeState.cardEl) {
-          lastRects.set(card, r);
-        }
-      }
-      activeState.addColRect = measureAddColRect(rowRect);
-
-      if (prefersReducedMotion()) {
-        for (const card of nextCards) {
-          if (card !== activeState.cardEl) card.style.transition = "";
-        }
-        return;
-      }
+      cacheLayoutRects(activeState, nextCards, lastRects);
 
       const movedCards = [];
       for (const card of nextCards) {
@@ -1718,10 +1697,7 @@
     function restoreInitialOrderWithFlip(activeState) {
       const currentCards = getVisibleCards();
       const currentIds = currentCards.map((el) => el.id);
-      if (
-        currentIds.length === activeState.initialVisibleOrder.length &&
-        currentIds.every((id, idx) => id === activeState.initialVisibleOrder[idx])
-      ) {
+      if (isSameOrder(currentIds, activeState.initialVisibleOrder)) {
         return;
       }
 
@@ -1921,10 +1897,7 @@
       document.body.classList.remove(CONSTANTS.CLASSES.DRAG_ACTIVE);
 
       const finalVisibleOrder = getVisibleCards().map((el) => el.id);
-      const orderChanged =
-        !cancelled &&
-        (finalVisibleOrder.length !== activeState.initialVisibleOrder.length ||
-          finalVisibleOrder.some((id, idx) => id !== activeState.initialVisibleOrder[idx]));
+      const orderChanged = !cancelled && !isSameOrder(finalVisibleOrder, activeState.initialVisibleOrder);
 
       let settled = false;
       const completeSettle = () => {
@@ -2436,15 +2409,7 @@
       mainRow.parentElement.querySelector(".bp-hidden-section")?.remove();
 
       for (const el of allCards) {
-        el.querySelector("." + CONSTANTS.CLASSES.EDIT_OVERLAY)?.remove();
-        el.querySelector("." + CONSTANTS.CLASSES.DROP_SLOT)?.remove();
-        el.classList.remove(
-          CONSTANTS.CLASSES.HIDDEN_ITEM,
-          CONSTANTS.CLASSES.DRAG_PLACEHOLDER,
-          CONSTANTS.CLASSES.DRAG_SETTLING
-        );
-        delete el.dataset.bpDraggable;
-        el.removeAttribute("draggable");
+        stripCardEditState(el);
       }
 
       mainRow.replaceChildren();

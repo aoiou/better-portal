@@ -7,11 +7,7 @@
     if (typeof onclick !== "string") return;
     delete link.dataset.bpOnclick;
 
-    if (!onclick) {
-      link.removeAttribute("onclick");
-      link.onclick = null;
-      return;
-    }
+    if (!onclick) return;
 
     link.setAttribute("onclick", onclick);
 

@@ -276,6 +276,17 @@
   // =====================================================================
 
   let observer = null;
+  let debounceTimer = null;
+
+  function stopObserver() {
+    if (debounceTimer !== null) {
+      clearTimeout(debounceTimer);
+      debounceTimer = null;
+    }
+    if (!observer) return;
+    observer.disconnect();
+    observer = null;
+  }
 
   // 全ての自動処理が完了したかを判定し、完了時に Observer を停止
   function checkAndStopObserver() {
@@ -290,8 +301,7 @@
                       state.focusedPassword;
 
     if (step1Done && step2Done) {
-      observer.disconnect();
-      observer = null;
+      stopObserver();
       return;
     }
 
@@ -299,14 +309,11 @@
     if (step1Done && cachedSettings) {
       const fido2Visible = document.getElementById('fido2-form-wrapper')?.style.display !== 'none';
       if (fido2Visible && !cachedSettings.autoFido2 && !cachedSettings.autoPasswordTab) {
-        observer.disconnect();
-        observer = null;
+        stopObserver();
       }
     }
   }
 
-  // debounce 用のタイマー ID
-  let debounceTimer = null;
   let handlingDomChanges = false;
 
   async function handleDomChanges() {
@@ -355,12 +362,7 @@
     // 初回チェック（observer セットアップ後に実行）
     debouncedHandleDomChanges();
 
-    setTimeout(() => {
-      if (observer) {
-        observer.disconnect();
-        observer = null;
-      }
-    }, OBSERVER_TIMEOUT);
+    setTimeout(stopObserver, OBSERVER_TIMEOUT);
   }
 
   // 初期化

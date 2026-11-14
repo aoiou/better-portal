@@ -717,17 +717,6 @@ body.bp-edit-mode .bp-add-card-col {
   flex: 1;
 }
 
-.bp-modal-option-header {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.bp-modal-option-list--grid .bp-modal-option-header {
-  gap: 5px;
-}
-
 .bp-modal-option-title {
   font-size: 14px;
   font-weight: 600;

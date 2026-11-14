@@ -769,11 +769,6 @@ html[data-bp-theme="dark"] .bp-preview-card {
   border-color: #334155;
 }
 
-html[data-bp-theme="dark"] .bp-preview-card .bp-custom-icon {
-  background: #ffffff;
-  color: #6f2c91;
-}
-
 html[data-bp-theme="dark"] .bp-preview-title {
   color: #93c5fd;
   border-top-color: #334155;
@@ -792,12 +787,6 @@ html[data-bp-theme="dark"] .bp-btn-cancel {
  * ===================================================================== */
 html[data-bp-theme="dark"] #PortalComment02:has(.card-body.collapse:not(.show):not(.collapsing)) > .card-header {
   border-bottom: none !important;
-  border-radius: var(--bs-card-inner-border-radius, 0.375rem);
-}
-
-html[data-bp-theme="dark"] .bp-notice-badge--unread {
-  background: #dc2626;
-  color: #ffffff;
 }
 
 html[data-bp-theme="dark"] .bp-notice-badge--read {
