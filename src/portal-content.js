@@ -14,9 +14,15 @@
       SERVICE_CARD: "bp-service-card",
       CUSTOM_CARD: "bp-custom-card",
       HIDDEN_ITEM: "bp-hidden-item",
-      DRAGGING: "bp-dragging",
-      DROP_BEFORE: "bp-drop-before",
-      DROP_AFTER: "bp-drop-after",
+      IS_DRAGGING: "bp-is-dragging",
+      DRAG_ACTIVE: "bp-drag-active",
+      DRAG_PLACEHOLDER: "bp-drag-placeholder",
+      DRAG_GHOST: "bp-drag-ghost",
+      DRAG_GHOST_LIFTED: "bp-drag-ghost-lifted",
+      DRAG_SETTLING: "bp-drag-settling",
+      DROP_SLOT: "bp-drop-slot",
+      DROP_SLOT_ENTER: "bp-drop-slot--entering",
+      DROP_SLOT_ICON: "bp-drop-slot-icon",
       EDIT_OVERLAY: "bp-edit-overlay",
       TOGGLE_OVERLAY: "bp-toggle-overlay",
       NOTICE_BADGE: "bp-notice-badge",
@@ -43,7 +49,7 @@
 
   let mainRow = null;
   let hiddenSectionOpen = false;
-  let draggedCardId = null;
+  let dragController = null;
   let cardTemplate = null;
   let activeModal = null;
 
@@ -190,18 +196,23 @@
       return newOrder;
     },
 
-    calcDragReorder(order, draggedId, targetId, insertBefore) {
-      const newOrder = [...order];
-      const dragIdx = newOrder.indexOf(draggedId);
-      if (dragIdx < 0) return null;
-
-      newOrder.splice(dragIdx, 1);
-      let targetIdx = newOrder.indexOf(targetId);
-      if (targetIdx < 0) return null;
-
-      if (!insertBefore) targetIdx++;
-      newOrder.splice(targetIdx, 0, draggedId);
-      return newOrder;
+    calcReorderFromVisible(order, hiddenIds, newVisibleOrder) {
+      if (!Array.isArray(order) || !Array.isArray(newVisibleOrder)) return null;
+      const hiddenSet = new Set(Array.isArray(hiddenIds) ? hiddenIds : []);
+      const visibleSet = new Set(newVisibleOrder);
+      let cursor = 0;
+      const result = [];
+      for (const id of order) {
+        if (hiddenSet.has(id) || !visibleSet.has(id)) {
+          result.push(id);
+        } else if (cursor < newVisibleOrder.length) {
+          result.push(newVisibleOrder[cursor++]);
+        }
+      }
+      while (cursor < newVisibleOrder.length) {
+        result.push(newVisibleOrder[cursor++]);
+      }
+      return result;
     },
   };
 
@@ -1046,14 +1057,14 @@
 
   function createCardTemplate(sourceCard) {
     const tpl = sourceCard.cloneNode(true);
-    tpl.querySelectorAll("." + CONSTANTS.CLASSES.EDIT_OVERLAY).forEach((el) => el.remove());
+    tpl.querySelectorAll("." + CONSTANTS.CLASSES.EDIT_OVERLAY + ", ." + CONSTANTS.CLASSES.DROP_SLOT).forEach((el) => el.remove());
     tpl.classList.remove(
       CONSTANTS.CLASSES.SERVICE_CARD,
       CONSTANTS.CLASSES.HIDDEN_ITEM,
-      CONSTANTS.CLASSES.DRAGGING,
-      CONSTANTS.CLASSES.DROP_BEFORE,
-      CONSTANTS.CLASSES.DROP_AFTER
+      CONSTANTS.CLASSES.DRAG_PLACEHOLDER,
+      CONSTANTS.CLASSES.DRAG_SETTLING
     );
+    delete tpl.dataset.bpDraggable;
     tpl.removeAttribute("draggable");
     tpl.removeAttribute("style");
     return tpl;
@@ -1444,74 +1455,670 @@
   }
 
   /* =====================================================================
-   * ドラッグ＆ドロップコントローラ (Drag and Drop Controller)
+   * ドラッグ＆ドロップコントローラ (Pointer Events + FLIP Live Reorder)
    * ===================================================================== */
-  function clearDropIndicators() {
-    mainRow?.querySelectorAll("." + CONSTANTS.CLASSES.DROP_BEFORE + ", ." + CONSTANTS.CLASSES.DROP_AFTER)
-      .forEach((el) => el.classList.remove(CONSTANTS.CLASSES.DROP_BEFORE, CONSTANTS.CLASSES.DROP_AFTER));
+  function createDropSlotElement() {
+    const slot = createEl("div", CONSTANTS.CLASSES.DROP_SLOT);
+    slot.setAttribute("aria-hidden", "true");
+
+    const iconWrap = createEl("div", CONSTANTS.CLASSES.DROP_SLOT_ICON);
+    const svg = document.createElementNS(CONSTANTS.SVG_NS, "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("aria-hidden", "true");
+
+    for (const d of ["M12 5v10", "M8.5 11.5L12 15l3.5-3.5", "M5 19h14"]) {
+      const path = document.createElementNS(CONSTANTS.SVG_NS, "path");
+      path.setAttribute("d", d);
+      path.setAttribute("fill", "none");
+      path.setAttribute("stroke", "currentColor");
+      path.setAttribute("stroke-width", "1.8");
+      path.setAttribute("stroke-linecap", "round");
+      path.setAttribute("stroke-linejoin", "round");
+      svg.appendChild(path);
+    }
+
+    iconWrap.appendChild(svg);
+    slot.appendChild(iconWrap);
+    return slot;
+  }
+
+  function createDragGhostElement(cardEl, rect) {
+    const ghost = cardEl.cloneNode(true);
+    if (ghost.id) ghost.removeAttribute("id");
+    ghost.querySelectorAll("[id]").forEach((n) => n.removeAttribute("id"));
+    ghost
+      .querySelectorAll("." + CONSTANTS.CLASSES.EDIT_OVERLAY + ", ." + CONSTANTS.CLASSES.DROP_SLOT)
+      .forEach((n) => n.remove());
+    ghost.removeAttribute("data-bp-draggable");
+    ghost.classList.remove(
+      CONSTANTS.CLASSES.SERVICE_CARD,
+      CONSTANTS.CLASSES.HIDDEN_ITEM,
+      CONSTANTS.CLASSES.DRAG_PLACEHOLDER,
+      CONSTANTS.CLASSES.DRAG_SETTLING
+    );
+    ghost.classList.add(CONSTANTS.CLASSES.DRAG_GHOST);
+    ghost.style.left = rect.left + "px";
+    ghost.style.top = rect.top + "px";
+    ghost.style.width = rect.width + "px";
+    ghost.style.height = rect.height + "px";
+    ghost.style.transform = "translate3d(0px, 0px, 0px)";
+    return ghost;
   }
 
   function initDragAndDrop(settings) {
-    mainRow.addEventListener("dragstart", (e) => {
-      const card = e.target.closest("." + CONSTANTS.CLASSES.SERVICE_CARD);
-      if (!card || !document.body.classList.contains(CONSTANTS.CLASSES.EDIT_MODE)) {
-        e.preventDefault();
-        return;
+    const MOVE_THRESHOLD_PX = 5;
+    const TOUCH_HOLD_MS = 240;
+    const TOUCH_CANCEL_MOVE_PX = 8;
+    const SWAP_COOLDOWN_MS = 180;
+    const SCROLL_EDGE_TOP_OFFSET = 56;
+    const SCROLL_ZONE_PX = 80;
+    const MAX_SCROLL_SPEED = 14;
+
+    const motionQuery = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+    const prefersReducedMotion = () => Boolean(motionQuery?.matches);
+
+    let state = null;
+    let suppressNextClick = false;
+    let suppressClickTimer = null;
+
+    function getVisibleCards() {
+      if (!mainRow) return [];
+      return [...mainRow.children].filter(
+        (el) =>
+          el.classList.contains(CONSTANTS.CLASSES.SERVICE_CARD) &&
+          !el.classList.contains(CONSTANTS.CLASSES.HIDDEN_ITEM)
+      );
+    }
+
+    function toRowRelativeRect(rect, rowRect) {
+      return {
+        left: rect.left - rowRect.left,
+        top: rect.top - rowRect.top,
+        right: rect.right - rowRect.left,
+        bottom: rect.bottom - rowRect.top,
+        width: rect.width,
+        height: rect.height,
+      };
+    }
+
+    function measureAddColRect(rowRect) {
+      const addCol = mainRow.querySelector(".bp-add-card-col");
+      return addCol && addCol.offsetParent !== null
+        ? toRowRelativeRect(addCol.getBoundingClientRect(), rowRect)
+        : null;
+    }
+
+    function cacheLayoutRects(activeState) {
+      if (!mainRow || !activeState) return;
+      const rowRect = mainRow.getBoundingClientRect();
+      activeState.layoutRects.clear();
+      for (const card of getVisibleCards()) {
+        activeState.layoutRects.set(card, toRowRelativeRect(card.getBoundingClientRect(), rowRect));
       }
-      draggedCardId = card.id;
-      e.dataTransfer.effectAllowed = "move";
-      e.dataTransfer.setData("text/plain", card.id);
-      requestAnimationFrame(() => card.classList.add(CONSTANTS.CLASSES.DRAGGING));
-    });
+      activeState.addColRect = measureAddColRect(rowRect);
+    }
 
-    mainRow.addEventListener("dragend", (e) => {
-      const card = e.target.closest("." + CONSTANTS.CLASSES.SERVICE_CARD);
-      if (card) card.classList.remove(CONSTANTS.CLASSES.DRAGGING);
-      clearDropIndicators();
-      draggedCardId = null;
-    });
+    function isInRect(px, py, rect) {
+      return Boolean(rect && px >= rect.left && px <= rect.right && py >= rect.top && py <= rect.bottom);
+    }
 
-    mainRow.addEventListener("dragover", (e) => {
-      if (!draggedCardId) return;
-      e.preventDefault();
-      e.dataTransfer.dropEffect = "move";
+    function findTargetIndex(activeState, clientX, clientY) {
+      const cards = getVisibleCards();
+      const fromIndex = cards.indexOf(activeState.cardEl);
+      if (fromIndex < 0) return null;
 
-      const card = e.target.closest("." + CONSTANTS.CLASSES.SERVICE_CARD);
-      if (!card || draggedCardId === card.id) return;
+      const rowRect = mainRow.getBoundingClientRect();
+      const px = clientX - rowRect.left;
+      const py = clientY - rowRect.top;
 
-      clearDropIndicators();
-      const rect = card.getBoundingClientRect();
-      const midX = rect.left + rect.width / 2;
-      card.classList.add(e.clientX < midX ? CONSTANTS.CLASSES.DROP_BEFORE : CONSTANTS.CLASSES.DROP_AFTER);
-    });
+      const draggedRect = activeState.layoutRects.get(activeState.cardEl);
+      if (!draggedRect) return null;
 
-    mainRow.addEventListener("dragleave", (e) => {
-      const card = e.target.closest("." + CONSTANTS.CLASSES.SERVICE_CARD);
-      if (card) card.classList.remove(CONSTANTS.CLASSES.DROP_BEFORE, CONSTANTS.CLASSES.DROP_AFTER);
-    });
+      // ポインターが自身の着地プレースホルダー上にある場合は位置を確定維持する
+      if (isInRect(px, py, draggedRect)) return null;
 
-    mainRow.addEventListener("drop", (e) => {
-      if (!draggedCardId) return;
-      e.preventDefault();
+      const now = performance.now();
 
-      const card = e.target.closest("." + CONSTANTS.CLASSES.SERVICE_CARD);
-      const shouldReorder = card && draggedCardId !== card.id;
+      for (let i = 0; i < cards.length; i++) {
+        const card = cards[i];
+        if (card === activeState.cardEl) continue;
+        const rect = activeState.layoutRects.get(card);
+        if (!isInRect(px, py, rect)) continue;
 
-      if (shouldReorder) {
-        const rect = card.getBoundingClientRect();
-        const midX = rect.left + rect.width / 2;
-        const insertBefore = e.clientX < midX;
-        const newOrder = OrderLogic.calcDragReorder(settings.order, draggedCardId, card.id, insertBefore);
-        if (newOrder) {
-          settings.order = newOrder;
-          saveSettings(settings);
+        if (card === activeState.lastSwapPartner && now - activeState.lastSwapAt < SWAP_COOLDOWN_MS) {
+          return null;
+        }
+
+        const verticalOverlap =
+          Math.min(rect.bottom, draggedRect.bottom) - Math.max(rect.top, draggedRect.top);
+        const sameRow = verticalOverlap > Math.min(rect.height, draggedRect.height) * 0.4;
+
+        let crossedThreshold = false;
+        if (sameRow) {
+          crossedThreshold =
+            i > fromIndex
+              ? px >= rect.left + rect.width * 0.22
+              : px <= rect.right - rect.width * 0.22;
+        } else {
+          crossedThreshold =
+            i > fromIndex
+              ? py >= rect.top + rect.height * 0.18
+              : py <= rect.bottom - rect.height * 0.18;
+        }
+
+        return crossedThreshold ? { index: i, partner: card } : null;
+      }
+
+      if (isInRect(px, py, activeState.addColRect) && fromIndex !== cards.length - 1) {
+        return { index: cards.length - 1, partner: cards[cards.length - 1] };
+      }
+
+      const lastCard = cards[cards.length - 1];
+      const lastRect = activeState.layoutRects.get(lastCard);
+      if (lastRect && fromIndex !== cards.length - 1) {
+        const inLastRowTail = py >= lastRect.top && py <= lastRect.bottom && px > lastRect.right;
+        const belowLastRow = py > lastRect.bottom && py <= rowRect.height + 32;
+        if (inLastRowTail || belowLastRow) {
+          return { index: cards.length - 1, partner: lastCard };
         }
       }
 
-      clearDropIndicators();
-      draggedCardId = null;
-      if (shouldReorder) applyLayout(settings);
+      const firstCard = cards[0];
+      const firstRect = activeState.layoutRects.get(firstCard);
+      if (firstRect && fromIndex !== 0 && py < firstRect.top && py >= -40 && px >= 0 && px <= rowRect.width) {
+        return { index: 0, partner: firstCard };
+      }
+
+      return null;
+    }
+
+    function applyFlipReorder(activeState, applyDomChange) {
+      const prevCards = getVisibleCards();
+      const firstRects = new Map();
+      for (const card of prevCards) {
+        if (card !== activeState.cardEl) {
+          firstRects.set(card, card.getBoundingClientRect());
+        }
+      }
+
+      applyDomChange();
+
+      const nextCards = getVisibleCards();
+      for (const card of nextCards) {
+        if (card !== activeState.cardEl) {
+          card.style.transition = "none";
+          card.style.transform = "";
+        }
+      }
+
+      const rowRect = mainRow.getBoundingClientRect();
+      const lastRects = new Map();
+      activeState.layoutRects.clear();
+      for (const card of nextCards) {
+        const r = card.getBoundingClientRect();
+        activeState.layoutRects.set(card, toRowRelativeRect(r, rowRect));
+        if (card !== activeState.cardEl) {
+          lastRects.set(card, r);
+        }
+      }
+      activeState.addColRect = measureAddColRect(rowRect);
+
+      if (prefersReducedMotion()) {
+        for (const card of nextCards) {
+          if (card !== activeState.cardEl) card.style.transition = "";
+        }
+        return;
+      }
+
+      const movedCards = [];
+      for (const card of nextCards) {
+        if (card === activeState.cardEl) continue;
+        const first = firstRects.get(card);
+        const last = lastRects.get(card);
+        if (!first || !last) continue;
+        const dx = first.left - last.left;
+        const dy = first.top - last.top;
+        if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) {
+          card.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
+          movedCards.push(card);
+        } else {
+          card.style.transition = "";
+        }
+      }
+
+      if (movedCards.length === 0) return;
+
+      mainRow.offsetHeight;
+      for (const card of movedCards) {
+        card.style.transition = "transform 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 180ms ease";
+        card.style.transform = "";
+      }
+    }
+
+    function moveCardWithFlip(activeState, targetIndex, partner) {
+      const cards = getVisibleCards();
+      const fromIndex = cards.indexOf(activeState.cardEl);
+      if (fromIndex < 0 || targetIndex < 0 || targetIndex >= cards.length || fromIndex === targetIndex) {
+        return false;
+      }
+
+      activeState.slotEl?.classList.remove(CONSTANTS.CLASSES.DROP_SLOT_ENTER);
+
+      const refNode = cards[targetIndex];
+      applyFlipReorder(activeState, () => {
+        if (targetIndex > fromIndex) refNode.after(activeState.cardEl);
+        else refNode.before(activeState.cardEl);
+      });
+
+      activeState.lastSwapPartner = partner || refNode;
+      activeState.lastSwapAt = performance.now();
+      return true;
+    }
+
+    function restoreInitialOrderWithFlip(activeState) {
+      const currentCards = getVisibleCards();
+      const currentIds = currentCards.map((el) => el.id);
+      if (
+        currentIds.length === activeState.initialVisibleOrder.length &&
+        currentIds.every((id, idx) => id === activeState.initialVisibleOrder[idx])
+      ) {
+        return;
+      }
+
+      const cardById = new Map(currentCards.map((el) => [el.id, el]));
+      const addCol = mainRow.querySelector(".bp-add-card-col");
+      applyFlipReorder(activeState, () => {
+        for (const id of activeState.initialVisibleOrder) {
+          const el = cardById.get(id);
+          if (!el) continue;
+          if (addCol) addCol.before(el);
+          else mainRow.appendChild(el);
+        }
+      });
+    }
+
+    function stopAutoScroll(activeState) {
+      if (activeState?.scrollRaf) {
+        cancelAnimationFrame(activeState.scrollRaf);
+        activeState.scrollRaf = 0;
+      }
+    }
+
+    function updateAutoScroll(activeState) {
+      if (!activeState || !activeState.dragging || activeState.settling) {
+        stopAutoScroll(activeState);
+        return;
+      }
+
+      const topBoundary = SCROLL_EDGE_TOP_OFFSET + SCROLL_ZONE_PX;
+      const bottomBoundary = window.innerHeight - SCROLL_ZONE_PX;
+
+      const calcScrollDelta = (y) => {
+        if (y < topBoundary) {
+          return -Math.ceil(Math.min(1, (topBoundary - y) / SCROLL_ZONE_PX) * MAX_SCROLL_SPEED);
+        }
+        if (y > bottomBoundary) {
+          return Math.ceil(Math.min(1, (y - bottomBoundary) / SCROLL_ZONE_PX) * MAX_SCROLL_SPEED);
+        }
+        return 0;
+      };
+
+      if (calcScrollDelta(activeState.lastClientY) === 0) {
+        stopAutoScroll(activeState);
+        return;
+      }
+
+      if (activeState.scrollRaf) return;
+
+      const step = () => {
+        if (!state || state !== activeState || !activeState.dragging || activeState.settling) {
+          activeState.scrollRaf = 0;
+          return;
+        }
+        const dy = calcScrollDelta(activeState.lastClientY);
+        if (dy === 0) {
+          activeState.scrollRaf = 0;
+          return;
+        }
+        const prevScrollY = window.scrollY;
+        window.scrollBy(0, dy);
+        if (window.scrollY !== prevScrollY) {
+          const target = findTargetIndex(activeState, activeState.lastClientX, activeState.lastClientY);
+          if (target) moveCardWithFlip(activeState, target.index, target.partner);
+        }
+        activeState.scrollRaf = requestAnimationFrame(step);
+      };
+
+      activeState.scrollRaf = requestAnimationFrame(step);
+    }
+
+    function updateGhostPosition(activeState, clientX, clientY) {
+      if (!activeState.ghostEl) return;
+      const dx = clientX - activeState.startClientX;
+      const dy = clientY - activeState.startClientY;
+      activeState.ghostEl.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
+    }
+
+    function detachGlobalListeners() {
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerCancel);
+      window.removeEventListener("keydown", onKeydown, true);
+      window.removeEventListener("blur", onWindowBlur);
+      window.removeEventListener("resize", onWindowResize);
+    }
+
+    function cleanupVisualState(activeState) {
+      stopAutoScroll(activeState);
+      if (activeState.holdTimer) {
+        clearTimeout(activeState.holdTimer);
+        activeState.holdTimer = 0;
+      }
+      if (activeState.settleTimer) {
+        clearTimeout(activeState.settleTimer);
+        activeState.settleTimer = 0;
+      }
+      if (activeState.ghostEl) {
+        activeState.ghostEl.remove();
+        activeState.ghostEl = null;
+      }
+      if (activeState.slotEl) {
+        activeState.slotEl.remove();
+        activeState.slotEl = null;
+      }
+      activeState.cardEl.classList.remove(CONSTANTS.CLASSES.DRAG_PLACEHOLDER, CONSTANTS.CLASSES.DRAG_SETTLING);
+      mainRow?.classList.remove(CONSTANTS.CLASSES.IS_DRAGGING);
+      document.body.classList.remove(CONSTANTS.CLASSES.DRAG_ACTIVE);
+
+      try {
+        if (mainRow?.hasPointerCapture?.(activeState.pointerId)) {
+          mainRow.releasePointerCapture(activeState.pointerId);
+        }
+      } catch {
+        // 既に解放済みの場合は無視
+      }
+
+      for (const card of getVisibleCards()) {
+        card.style.transition = "";
+        card.style.transform = "";
+      }
+    }
+
+    function beginDrag(activeState) {
+      if (!activeState || activeState.dragging) return;
+      if (!document.body.classList.contains(CONSTANTS.CLASSES.EDIT_MODE)) {
+        abortState();
+        return;
+      }
+
+      activeState.dragging = true;
+      if (activeState.holdTimer) {
+        clearTimeout(activeState.holdTimer);
+        activeState.holdTimer = 0;
+      }
+
+      const rect = activeState.cardEl.getBoundingClientRect();
+      activeState.startCardRect = rect;
+      activeState.initialVisibleOrder = getVisibleCards().map((el) => el.id);
+      cacheLayoutRects(activeState);
+
+      const ghost = createDragGhostElement(activeState.cardEl, rect);
+      const ghostMount = activeState.cardEl.closest(".user-account") || document.body;
+      ghostMount.appendChild(ghost);
+      activeState.ghostEl = ghost;
+
+      const slot = createDropSlotElement();
+      if (!prefersReducedMotion()) {
+        slot.classList.add(CONSTANTS.CLASSES.DROP_SLOT_ENTER);
+        slot.addEventListener(
+          "animationend",
+          () => slot.classList.remove(CONSTANTS.CLASSES.DROP_SLOT_ENTER),
+          { once: true }
+        );
+      }
+      activeState.cardEl.appendChild(slot);
+      activeState.slotEl = slot;
+
+      activeState.cardEl.classList.add(CONSTANTS.CLASSES.DRAG_PLACEHOLDER);
+      mainRow.classList.add(CONSTANTS.CLASSES.IS_DRAGGING);
+      document.body.classList.add(CONSTANTS.CLASSES.DRAG_ACTIVE);
+
+      // 強制リフロー後に浮き上がり状態クラスを付与して滑らかに浮かせる
+      ghost.offsetHeight;
+      ghost.classList.add(CONSTANTS.CLASSES.DRAG_GHOST_LIFTED);
+      updateGhostPosition(activeState, activeState.lastClientX, activeState.lastClientY);
+
+      try {
+        mainRow.setPointerCapture?.(activeState.pointerId);
+      } catch {
+        // ポインターが既に解放されている場合は無視
+      }
+
+      suppressNextClick = true;
+      if (suppressClickTimer) clearTimeout(suppressClickTimer);
+    }
+
+    function finishDrag(cancelled) {
+      const activeState = state;
+      if (!activeState) return;
+
+      if (!activeState.dragging) {
+        abortState();
+        return;
+      }
+      if (activeState.settling) return;
+      activeState.settling = true;
+
+      stopAutoScroll(activeState);
+      detachGlobalListeners();
+
+      if (cancelled) {
+        restoreInitialOrderWithFlip(activeState);
+      }
+
+      // 着地直前に周辺カードのディミングを戻し、着地枠への収束を強調する
+      mainRow.classList.remove(CONSTANTS.CLASSES.IS_DRAGGING);
+      document.body.classList.remove(CONSTANTS.CLASSES.DRAG_ACTIVE);
+
+      const finalVisibleOrder = getVisibleCards().map((el) => el.id);
+      const orderChanged =
+        !cancelled &&
+        (finalVisibleOrder.length !== activeState.initialVisibleOrder.length ||
+          finalVisibleOrder.some((id, idx) => id !== activeState.initialVisibleOrder[idx]));
+
+      let settled = false;
+      const completeSettle = () => {
+        if (settled) return;
+        settled = true;
+        if (state === activeState) state = null;
+        cleanupVisualState(activeState);
+
+        suppressClickTimer = setTimeout(() => {
+          suppressNextClick = false;
+        }, 50);
+
+        if (orderChanged) {
+          const newOrder = OrderLogic.calcReorderFromVisible(
+            settings.order,
+            settings.hiddenIds,
+            finalVisibleOrder
+          );
+          if (newOrder) {
+            settings.order = newOrder;
+            saveSettings(settings);
+          }
+          applyLayout(settings);
+        }
+      };
+
+      if (prefersReducedMotion() || !activeState.ghostEl) {
+        completeSettle();
+        return;
+      }
+
+      const targetRect = activeState.cardEl.getBoundingClientRect();
+      const settleDx = targetRect.left - activeState.startCardRect.left;
+      const settleDy = targetRect.top - activeState.startCardRect.top;
+
+      activeState.cardEl.classList.add(CONSTANTS.CLASSES.DRAG_SETTLING);
+      activeState.ghostEl.classList.remove(CONSTANTS.CLASSES.DRAG_GHOST_LIFTED);
+      activeState.ghostEl.classList.add(CONSTANTS.CLASSES.DRAG_SETTLING);
+      activeState.ghostEl.offsetHeight;
+      activeState.ghostEl.style.transform = `translate3d(${settleDx}px, ${settleDy}px, 0)`;
+
+      activeState.ghostEl.addEventListener("transitionend", (e) => {
+        if (e.target === activeState.ghostEl && e.propertyName === "transform") {
+          completeSettle();
+        }
+      });
+      activeState.settleTimer = setTimeout(completeSettle, 200);
+    }
+
+    function abortState() {
+      const activeState = state;
+      if (!activeState) return;
+      state = null;
+      detachGlobalListeners();
+      if (activeState.dragging && !activeState.settling) {
+        restoreInitialOrderWithFlip(activeState);
+      }
+      cleanupVisualState(activeState);
+      suppressNextClick = false;
+    }
+
+    function onPointerMove(e) {
+      const activeState = state;
+      if (!activeState || e.pointerId !== activeState.pointerId || activeState.settling) return;
+
+      activeState.lastClientX = e.clientX;
+      activeState.lastClientY = e.clientY;
+
+      if (!activeState.dragging) {
+        const dist = Math.hypot(e.clientX - activeState.startClientX, e.clientY - activeState.startClientY);
+        if (activeState.pointerType === "touch") {
+          if (dist >= TOUCH_CANCEL_MOVE_PX) {
+            abortState();
+          }
+          return;
+        }
+        if (dist >= MOVE_THRESHOLD_PX) {
+          beginDrag(activeState);
+        } else {
+          return;
+        }
+      }
+
+      updateGhostPosition(activeState, e.clientX, e.clientY);
+      const target = findTargetIndex(activeState, e.clientX, e.clientY);
+      if (target) {
+        moveCardWithFlip(activeState, target.index, target.partner);
+      }
+      updateAutoScroll(activeState);
+    }
+
+    function onPointerUp(e) {
+      if (!state || e.pointerId !== state.pointerId) return;
+      finishDrag(false);
+    }
+
+    function onPointerCancel(e) {
+      if (!state || e.pointerId !== state.pointerId) return;
+      finishDrag(true);
+    }
+
+    function onKeydown(e) {
+      if (e.key === "Escape" && state?.dragging) {
+        e.preventDefault();
+        e.stopPropagation();
+        finishDrag(true);
+      }
+    }
+
+    function onWindowBlur() {
+      if (state?.dragging) finishDrag(true);
+      else abortState();
+    }
+
+    function onWindowResize() {
+      if (state?.dragging && !state.settling) {
+        cacheLayoutRects(state);
+      }
+    }
+
+    mainRow.addEventListener("pointerdown", (e) => {
+      if (state) return;
+      if (e.pointerType !== "touch" && e.button !== 0) return;
+      if (!document.body.classList.contains(CONSTANTS.CLASSES.EDIT_MODE)) return;
+
+      const targetEl = e.target instanceof Element ? e.target : e.target?.parentElement;
+      if (!targetEl) return;
+      if (targetEl.closest("button, a, input, select, .bp-btn")) return;
+
+      const cardEl = targetEl.closest("." + CONSTANTS.CLASSES.SERVICE_CARD);
+      if (!cardEl || cardEl.parentElement !== mainRow) return;
+      if (cardEl.classList.contains(CONSTANTS.CLASSES.HIDDEN_ITEM)) return;
+      if (cardEl.dataset.bpDraggable !== "1") return;
+
+      if (e.pointerType !== "touch") {
+        e.preventDefault();
+      }
+
+      const nextState = {
+        cardEl,
+        pointerId: e.pointerId,
+        pointerType: e.pointerType,
+        startClientX: e.clientX,
+        startClientY: e.clientY,
+        lastClientX: e.clientX,
+        lastClientY: e.clientY,
+        startCardRect: null,
+        initialVisibleOrder: [],
+        layoutRects: new Map(),
+        addColRect: null,
+        dragging: false,
+        settling: false,
+        ghostEl: null,
+        slotEl: null,
+        holdTimer: 0,
+        settleTimer: 0,
+        scrollRaf: 0,
+        lastSwapPartner: null,
+        lastSwapAt: 0,
+      };
+      state = nextState;
+
+      if (e.pointerType === "touch") {
+        nextState.holdTimer = setTimeout(() => {
+          if (state === nextState && !nextState.dragging) {
+            beginDrag(nextState);
+          }
+        }, TOUCH_HOLD_MS);
+      }
+
+      window.addEventListener("pointermove", onPointerMove);
+      window.addEventListener("pointerup", onPointerUp);
+      window.addEventListener("pointercancel", onPointerCancel);
+      window.addEventListener("keydown", onKeydown, true);
+      window.addEventListener("blur", onWindowBlur);
+      window.addEventListener("resize", onWindowResize);
     });
+
+    mainRow.addEventListener(
+      "click",
+      (e) => {
+        if (!suppressNextClick) return;
+        e.preventDefault();
+        e.stopPropagation();
+        suppressNextClick = false;
+      },
+      true
+    );
+
+    return {
+      cancel() {
+        abortState();
+      },
+    };
   }
 
   /* =====================================================================
@@ -1809,6 +2416,7 @@
    * レイアウト・編集モード・アプリケーション統合 (PortalApp)
    * ===================================================================== */
   function applyLayout(settings) {
+    dragController?.cancel();
     const portalCards = getAllServiceCards();
     if (mainRow && portalCards.length > 0) {
       if (!cardTemplate) cardTemplate = createCardTemplate(portalCards[0]);
@@ -1829,7 +2437,13 @@
 
       for (const el of allCards) {
         el.querySelector("." + CONSTANTS.CLASSES.EDIT_OVERLAY)?.remove();
-        el.classList.remove(CONSTANTS.CLASSES.HIDDEN_ITEM);
+        el.querySelector("." + CONSTANTS.CLASSES.DROP_SLOT)?.remove();
+        el.classList.remove(
+          CONSTANTS.CLASSES.HIDDEN_ITEM,
+          CONSTANTS.CLASSES.DRAG_PLACEHOLDER,
+          CONSTANTS.CLASSES.DRAG_SETTLING
+        );
+        delete el.dataset.bpDraggable;
         el.removeAttribute("draggable");
       }
 
@@ -1842,7 +2456,7 @@
         const el = cardById.get(id);
         if (!el || hiddenSet.has(id)) continue;
         el.classList.add(CONSTANTS.CLASSES.SERVICE_CARD);
-        el.setAttribute("draggable", "true");
+        el.dataset.bpDraggable = "1";
         el.appendChild(createEditOverlay(el, settings, onUpdate));
         mainRow.appendChild(el);
       }
@@ -1909,6 +2523,7 @@
     }
 
     function exitEditMode() {
+      dragController?.cancel();
       closeModal();
       document.body.classList.remove(CONSTANTS.CLASSES.EDIT_MODE);
       btn.classList.remove("active");
@@ -1945,7 +2560,7 @@
 
       const settings = await loadSettings();
       if (mainRow) {
-        initDragAndDrop(settings);
+        dragController = initDragAndDrop(settings);
       }
       applyLayout(settings);
       createSettingsButton(settings);
