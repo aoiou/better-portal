@@ -466,3 +466,76 @@ test("drag-and-drop commits reordered cards immediately even when exiting edit m
     "div-3",
   ]);
 });
+
+test("M365 modal switches cleanly to Outlook (domain_hint) from default, onedrive, and outlook (login_srf) and persists to storage", async () => {
+  const env = createPortalTestEnv({
+    syncInitial: {
+      betterPortalSettings: {
+        hiddenIds: [],
+        order: ["div-1", "div-2", "div-3"],
+      },
+    },
+    includeMain: true,
+    setupDom: buildMockPortalDom,
+  });
+
+  await new Promise((r) => setTimeout(r, 15));
+
+  const { document, syncStore, BP } = env;
+  const { CONSTANTS } = BP;
+  const m365Card = document.getElementById("div-2");
+  const m365Link = m365Card.querySelector("a.service-thumb");
+
+  document.querySelector(".bp-settings-btn").click();
+
+  const selectAndSave = (presetId, variantId = null) => {
+    m365Card.querySelector(".bp-btn-link").click();
+    const form = document.querySelector(".bp-modal-form");
+    const radio = form.querySelector(`input[type="radio"][value="${presetId}"]`);
+    radio.checked = true;
+    if (variantId) {
+      const select = form.querySelector(".bp-modal-select");
+      select.value = variantId;
+      select.dispatchEvent({ type: "change", bubbles: true });
+    }
+    form.dispatchEvent({ type: "submit", preventDefault() {} });
+  };
+
+  // Default -> Outlook (新方式 / domain_hint)
+  selectAndSave("outlook", "domain_hint");
+  await new Promise((r) => setTimeout(r, 10));
+  assert.equal(
+    m365Link.dataset.bpOnclick,
+    "return doPortal('https://outlook.cloud.microsoft/mail/?domain_hint=mail.doshisha.ac.jp')"
+  );
+  assert.equal(syncStore.get(CONSTANTS.STORAGE_KEY).m365RedirectUrl, "https://outlook.cloud.microsoft/mail/");
+  assert.equal(syncStore.get(CONSTANTS.STORAGE_KEY).m365RedirectMethod, "domain_hint");
+  assert.equal(m365Card.querySelector(".bp-btn-link").title, "現在の設定: Outlook（新方式）");
+
+  // OneDrive -> Outlook (新方式 / domain_hint)
+  selectAndSave("onedrive");
+  await new Promise((r) => setTimeout(r, 10));
+  assert.equal(syncStore.get(CONSTANTS.STORAGE_KEY).m365RedirectUrl, "https://doshishaacjp-my.sharepoint.com/my");
+  assert.equal(syncStore.get(CONSTANTS.STORAGE_KEY).m365RedirectMethod, "login_srf");
+
+  selectAndSave("outlook", "domain_hint");
+  await new Promise((r) => setTimeout(r, 10));
+  assert.equal(syncStore.get(CONSTANTS.STORAGE_KEY).m365RedirectUrl, "https://outlook.cloud.microsoft/mail/");
+  assert.equal(syncStore.get(CONSTANTS.STORAGE_KEY).m365RedirectMethod, "domain_hint");
+  assert.equal(
+    m365Link.dataset.bpOnclick,
+    "return doPortal('https://outlook.cloud.microsoft/mail/?domain_hint=mail.doshisha.ac.jp')"
+  );
+
+  // Outlook (旧方式 / login_srf) -> Outlook (新方式 / domain_hint)
+  selectAndSave("outlook", "login_srf");
+  await new Promise((r) => setTimeout(r, 10));
+  assert.equal(syncStore.get(CONSTANTS.STORAGE_KEY).m365RedirectUrl, "https://outlook.office.com/mail/");
+  assert.equal(syncStore.get(CONSTANTS.STORAGE_KEY).m365RedirectMethod, "login_srf");
+
+  selectAndSave("outlook", "domain_hint");
+  await new Promise((r) => setTimeout(r, 10));
+  assert.equal(syncStore.get(CONSTANTS.STORAGE_KEY).m365RedirectUrl, "https://outlook.cloud.microsoft/mail/");
+  assert.equal(syncStore.get(CONSTANTS.STORAGE_KEY).m365RedirectMethod, "domain_hint");
+  assert.equal(m365Card.querySelector(".bp-btn-link").title, "現在の設定: Outlook（新方式）");
+});

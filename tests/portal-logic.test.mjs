@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createPortalTestEnv } from "./helpers/test-helpers.mjs";
+import fs from "node:fs";
+import path from "node:path";
+import vm from "node:vm";
+import { SRC_DIR, createPortalTestEnv } from "./helpers/test-helpers.mjs";
 
 test("OrderLogic moves visible cards while skipping hidden items and reconciles order", () => {
   const { BP } = createPortalTestEnv();
@@ -41,6 +44,10 @@ test("UrlM365 validates URLs, builds domain_hint/login_srf onclicks, and dispatc
     UrlM365.buildM365DomainHintUrl("https://example.com/?domain_hint=custom.ac.jp"),
     "https://example.com/?domain_hint=custom.ac.jp"
   );
+  assert.equal(
+    UrlM365.buildM365DomainHintUrl("https://example.com/?Domain_Hint=custom.ac.jp"),
+    "https://example.com/?Domain_Hint=custom.ac.jp"
+  );
 
   const origOnclick =
     "return doPortal('https://login.microsoftonline.com/login.srf?wa=wsignin1.0&wreply=https%3A%2F%2Fwww.office.com%2F')";
@@ -80,6 +87,48 @@ test("UrlM365 validates URLs, builds domain_hint/login_srf onclicks, and dispatc
   assert.equal(
     link.dataset.bpOnclick,
     "return doPortal('https://outlook.cloud.microsoft/mail/?domain_hint=mail.doshisha.ac.jp')"
+  );
+});
+
+test("UrlM365.buildM365DomainHintUrl works when URLSearchParams iterators are non-iterable (Firefox XrayWrapper)", () => {
+  // Simulate Firefox content-script XrayWrapper where URLSearchParams.keys()/entries()/values() return non-iterable objects
+  class XrayLikeURL {
+    constructor(input) {
+      const inner = new URL(input);
+      this._inner = inner;
+      this.searchParams = {
+        forEach: (cb) => inner.searchParams.forEach(cb),
+        set: (k, v) => inner.searchParams.set(k, v),
+        get: (k) => inner.searchParams.get(k),
+        has: (k) => inner.searchParams.has(k),
+        keys: () => ({}),
+        values: () => ({}),
+        entries: () => ({}),
+      };
+    }
+    get protocol() {
+      return this._inner.protocol;
+    }
+    get href() {
+      return this._inner.href;
+    }
+  }
+
+  const ctx = { URL: XrayLikeURL, window: {}, document: { querySelector: () => null } };
+  ctx.globalThis = ctx;
+  vm.createContext(ctx);
+  for (const rel of ["portal/constants.js", "portal/url-m365.js"]) {
+    vm.runInContext(fs.readFileSync(path.join(SRC_DIR, rel), "utf8"), ctx, { filename: rel });
+  }
+
+  const { UrlM365 } = ctx.BetterPortal;
+  assert.equal(
+    UrlM365.buildM365DomainHintUrl("https://outlook.cloud.microsoft/mail/"),
+    "https://outlook.cloud.microsoft/mail/?domain_hint=mail.doshisha.ac.jp"
+  );
+  assert.equal(
+    UrlM365.buildM365DomainHintUrl("https://example.com/?Domain_Hint=custom.ac.jp"),
+    "https://example.com/?Domain_Hint=custom.ac.jp"
   );
 });
 

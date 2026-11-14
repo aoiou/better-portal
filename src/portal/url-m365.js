@@ -114,9 +114,13 @@
     const targetUrl = normalizeUrl(inputUrl);
     if (!targetUrl) return null;
     const url = new URL(targetUrl);
-    const hasDomainHint = [...url.searchParams.keys()].some(
-      (key) => key.toLowerCase() === "domain_hint"
-    );
+    // Firefox のコンテンツスクリプト (XrayWrapper) では searchParams.keys() のイテレータが反復不可なため forEach で走査する
+    let hasDomainHint = false;
+    url.searchParams.forEach((_value, key) => {
+      if (key.toLowerCase() === "domain_hint") {
+        hasDomainHint = true;
+      }
+    });
     if (!hasDomainHint) {
       url.searchParams.set("domain_hint", domainHint);
     }

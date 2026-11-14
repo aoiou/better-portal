@@ -290,10 +290,10 @@
             (newUrl, newMethod) => {
               settings.m365RedirectUrl = newUrl;
               settings.m365RedirectMethod = newMethod;
+              Storage.saveSettings(settings);
               UrlM365.applyM365Redirect(el, settings);
               refreshCardOverlay(el, settings, settingsBtn);
               el.querySelector(".bp-btn-link")?.focus({ preventScroll: true });
-              Storage.saveSettings(settings);
             }
           );
         }
