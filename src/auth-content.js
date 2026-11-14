@@ -36,21 +36,16 @@
   // 設定キャッシュ（IPC 通信を最小化）
   // =====================================================================
   const SETTINGS_KEYS = ['savedUsername', 'autoSubmit', 'autoFido2', 'autoPasswordTab'];
-  const DEFAULT_SETTINGS = {
-    savedUsername: '',
-    autoSubmit: false,
-    autoFido2: false,
-    autoPasswordTab: false
-  };
 
   let cachedSettings = null;
 
-  function parseSettings(raw) {
+  function parseSettings(raw = {}) {
+    const src = raw || {};
     return {
-      username: raw.savedUsername || '',
-      autoSubmit: !!raw.autoSubmit,
-      autoFido2: !!raw.autoFido2,
-      autoPasswordTab: !!raw.autoPasswordTab
+      username: src.savedUsername || '',
+      autoSubmit: !!src.autoSubmit,
+      autoFido2: !!src.autoFido2,
+      autoPasswordTab: !!src.autoPasswordTab
     };
   }
 
@@ -63,7 +58,7 @@
       cachedSettings = parseSettings(result);
     } catch (err) {
       console.error('[Better Portal] Failed to load settings:', err);
-      cachedSettings = parseSettings(DEFAULT_SETTINGS);
+      cachedSettings = parseSettings();
     }
     return cachedSettings;
   }

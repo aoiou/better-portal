@@ -652,7 +652,7 @@ body.bp-edit-mode #PortalComment02 {
   line-height: 1.4;
 }
 
-.bp-notice-fold-bar.is-expanded .bp-notice-fold-icon {
+.bp-notice-fold-bar[aria-expanded="true"] .bp-notice-fold-icon {
   transform: rotate(90deg);
 }
 

@@ -21,8 +21,6 @@
       TOGGLE_OVERLAY: "bp-toggle-overlay",
       NOTICE_BADGE: "bp-notice-badge",
       NOTICE_FOOTER: "bp-notice-footer",
-      NOTICE_READ: "bp-notice-read",
-      NOTICE_UNREAD: "bp-notice-unread",
       NOTICE_BOTTOM: "bp-notice-bottom",
       NOTICE_BLOCK_READ: "bp-notice-block--read",
       NOTICE_BLOCK_FOLDED: "bp-notice-block--folded",
@@ -56,7 +54,7 @@
     { key: "hideSearchBar", find: () => document.getElementById("filterValue")?.closest(".row"), showLabel: "検索欄 を表示する", hideLabel: "検索欄 を非表示にする" },
     {
       key: "noticeToBottom",
-      find: () => document.getElementById("PortalComment02"),
+      find: () => document.querySelector(CONSTANTS.SELECTOR.NOTICE_CARD),
       showLabel: "お知らせを一番下に移動 を元に戻す",
       hideLabel: "お知らせを一番下に移動",
       apply(el, active) {
@@ -139,7 +137,9 @@
       readNoticeBlocks: Array.isArray(raw.readNoticeBlocks)
         ? [...new Set(raw.readNoticeBlocks.filter((h) => typeof h === "string" && h.length > 0))]
         : defaults.readNoticeBlocks,
-      m365RedirectUrl: typeof raw.m365RedirectUrl === "string" ? raw.m365RedirectUrl.trim() : defaults.m365RedirectUrl,
+      m365RedirectUrl: typeof raw.m365RedirectUrl === "string"
+        ? (normalizeUrl(raw.m365RedirectUrl) || "")
+        : defaults.m365RedirectUrl,
       customCards: Array.isArray(raw.customCards)
         ? raw.customCards.filter((c) => c && typeof c === "object" && typeof c.id === "string" && typeof c.title === "string")
         : defaults.customCards,
@@ -337,27 +337,16 @@
       if (current.length === 0) {
         return {
           status: "empty",
-          hasUnseen: false,
           hasMixedReadAndUnseen: false,
           shouldPrune: read.length > 0,
           prunedReadHashes: [],
-        };
-      }
-      if (read.length === 0) {
-        return {
-          status: "unread",
-          hasUnseen: true,
-          hasMixedReadAndUnseen: false,
-          shouldPrune: false,
-          prunedReadHashes: read,
         };
       }
       const readSet = new Set(read);
       if (current.some((h) => !readSet.has(h))) {
         return {
           status: "unread",
-          hasUnseen: true,
-          hasMixedReadAndUnseen: current.some((h) => readSet.has(h)),
+          hasMixedReadAndUnseen: read.length > 0 && current.some((h) => readSet.has(h)),
           shouldPrune: false,
           prunedReadHashes: read,
         };
@@ -367,7 +356,6 @@
       const pruned = uniqueRead.filter((h) => currentSet.has(h));
       return {
         status: "read",
-        hasUnseen: false,
         hasMixedReadAndUnseen: false,
         shouldPrune: pruned.length !== read.length,
         prunedReadHashes: pruned,
@@ -381,36 +369,32 @@
       const classifyUnit = (el) => {
         const matched = entries.filter((e) => e.element && (e.element === el || el.contains(e.element)));
         if (matched.length === 0) {
-          return { kind: "spacer", readCount: 0, hashes: [] };
+          return { kind: "spacer", hashes: [] };
         }
         if (matched.every((e) => readSet.has(e.hash))) {
           return {
             kind: "read",
-            readCount: matched.length,
             hashes: matched.map((e) => e.hash),
           };
         }
-        return { kind: "unseen", readCount: 0, hashes: [] };
+        return { kind: "unseen", hashes: [] };
       };
 
       const walkContainer = (container) => {
         let currentUnits = [];
         let trailingSpacers = [];
-        let currentReadCount = 0;
         let currentHashes = [];
 
         const flush = () => {
-          if (currentUnits.length > 0 && currentReadCount > 0) {
+          if (currentUnits.length > 0) {
             groups.push({
               elements: currentUnits,
               anchor: currentUnits[0],
-              readCount: currentReadCount,
               key: `${groups.length}:${currentHashes.join("|")}`,
             });
           }
           currentUnits = [];
           trailingSpacers = [];
-          currentReadCount = 0;
           currentHashes = [];
         };
 
@@ -435,7 +419,6 @@
             }
             trailingSpacers = [];
             currentUnits.push(node);
-            currentReadCount += info.readCount;
             currentHashes.push(...info.hashes);
           } else if (info.kind === "spacer") {
             if (currentUnits.length > 0) {
@@ -486,16 +469,13 @@
   }
 
   function buildM365Onclick(originalOnclick, inputUrl) {
-    let trimmed = inputUrl.trim();
-    if (!trimmed || !originalOnclick) return originalOnclick;
-    if (!/^https?:\/\//i.test(trimmed)) {
-      trimmed = "https://" + trimmed;
-    }
-    if (/^https?:\/\/login\.microsoftonline\.com\//i.test(trimmed) || !/[?&]wreply=/i.test(originalOnclick)) {
-      const escaped = trimmed.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+    const targetUrl = normalizeUrl(inputUrl);
+    if (!targetUrl || !originalOnclick) return originalOnclick;
+    if (/^https?:\/\/login\.microsoftonline\.com\//i.test(targetUrl) || !/[?&]wreply=/i.test(originalOnclick)) {
+      const escaped = targetUrl.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
       return originalOnclick.replace(/https?:\/\/[^'"]+/i, () => escaped);
     }
-    return originalOnclick.replace(/([?&]wreply=)[^'&"]+/i, (_match, p1) => p1 + encodeURIComponent(trimmed));
+    return originalOnclick.replace(/([?&]wreply=)[^'&"]+/i, (_match, p1) => p1 + encodeURIComponent(targetUrl));
   }
 
   function applyM365Redirect(el, settings) {
@@ -522,8 +502,15 @@
   }
 
   /* =====================================================================
-   * モーダルダイアログ基盤 (Modal Dialog Framework - DRY & A11y)
+   * DOM ユーティリティ & モーダルダイアログ基盤
    * ===================================================================== */
+  function createEl(tag, className, text) {
+    const el = document.createElement(tag);
+    if (className) el.className = className;
+    if (text != null) el.textContent = String(text);
+    return el;
+  }
+
   function closeModal() {
     if (!activeModal) return;
     document.removeEventListener("keydown", activeModal.onKeydown, true);
@@ -534,40 +521,33 @@
   function createModalFrame({ title, ariaLabel, submitText, onRenderBody, onSubmit }) {
     closeModal();
 
-    const make = (tag, className, text) => {
-      const el = document.createElement(tag);
-      if (className) el.className = className;
-      if (text != null) el.textContent = text;
-      return el;
-    };
-
-    const backdrop = make("div", "bp-modal-backdrop");
-    const dialog = make("div", "bp-modal-dialog");
+    const backdrop = createEl("div", "bp-modal-backdrop");
+    const dialog = createEl("div", "bp-modal-dialog");
     dialog.setAttribute("role", "dialog");
     dialog.setAttribute("aria-modal", "true");
     dialog.setAttribute("aria-label", ariaLabel || title);
 
-    const form = make("form", "bp-modal-form");
+    const form = createEl("form", "bp-modal-form");
     form.noValidate = true;
-    form.appendChild(make("h3", "bp-modal-title", title));
+    form.appendChild(createEl("h3", "bp-modal-title", title));
 
-    const errorEl = make("p", "bp-modal-error");
+    const errorEl = createEl("p", "bp-modal-error");
 
     const makeField = (labelText, input, hint) => {
-      const field = make("label", "bp-modal-field");
-      field.appendChild(make("span", "bp-modal-label", labelText));
+      const field = createEl("label", "bp-modal-field");
+      field.appendChild(createEl("span", "bp-modal-label", labelText));
       field.appendChild(input);
-      if (hint) field.appendChild(make("span", "bp-modal-hint", hint));
+      if (hint) field.appendChild(createEl("span", "bp-modal-hint", hint));
       return field;
     };
 
-    onRenderBody({ form, make, makeField, errorEl });
+    onRenderBody({ form, makeField, errorEl });
     form.appendChild(errorEl);
 
-    const actions = make("div", "bp-modal-actions");
-    const cancelBtn = make("button", "bp-btn bp-btn-cancel", "キャンセル");
+    const actions = createEl("div", "bp-modal-actions");
+    const cancelBtn = createEl("button", "bp-btn bp-btn-cancel", "キャンセル");
     cancelBtn.type = "button";
-    const saveBtn = make("button", "bp-btn bp-btn-save", submitText || "保存");
+    const saveBtn = createEl("button", "bp-btn bp-btn-save", submitText || "保存");
     saveBtn.type = "submit";
     actions.append(cancelBtn, saveBtn);
     form.appendChild(actions);
@@ -621,8 +601,8 @@
       title: "Microsoft365の遷移先設定",
       ariaLabel: "Microsoft365の遷移先URLを設定",
       submitText: "保存",
-      onRenderBody({ form, make, makeField }) {
-        urlInput = make("input", "bp-modal-input");
+      onRenderBody({ form, makeField }) {
+        urlInput = createEl("input", "bp-modal-input");
         urlInput.type = "text";
         urlInput.inputMode = "url";
         urlInput.maxLength = 2000;
@@ -695,18 +675,13 @@
   }
 
   function createIconElement(iconType, iconValue, forPreview = false) {
-    const wrap = document.createElement("div");
-    wrap.className = forPreview ? "bp-custom-icon" : "service-thumb-img bp-custom-icon";
+    const wrap = createEl("div", forPreview ? "bp-custom-icon" : "service-thumb-img bp-custom-icon");
 
     const imageUrl = iconType === "url" ? normalizeUrl(iconValue) : null;
     if (iconType === "emoji" && iconValue?.trim()) {
-      const emoji = document.createElement("span");
-      emoji.className = "bp-card-emoji";
-      emoji.textContent = iconValue.trim();
-      wrap.appendChild(emoji);
+      wrap.appendChild(createEl("span", "bp-card-emoji", iconValue.trim()));
     } else if (imageUrl) {
-      const img = document.createElement("img");
-      img.className = "bp-card-image";
+      const img = createEl("img", "bp-card-image");
       img.alt = "";
       img.referrerPolicy = "no-referrer";
       img.draggable = false;
@@ -812,24 +787,24 @@
       const key = JSON.stringify([type, value, title]);
       if (key === lastPreviewKey) return;
       lastPreviewKey = key;
-      const previewTitle = document.createElement("span");
-      previewTitle.className = "bp-preview-title";
-      previewTitle.textContent = title;
-      previewCard.replaceChildren(createIconElement(type, value, true), previewTitle);
+      previewCard.replaceChildren(
+        createIconElement(type, value, true),
+        createEl("span", "bp-preview-title", title)
+      );
     }
 
     const { form, errorEl } = createModalFrame({
       title: card ? "オリジナルカードを編集" : "オリジナルカードを追加",
       ariaLabel: card ? "オリジナルカードを編集" : "オリジナルカードを追加",
       submitText: card ? "保存" : "追加",
-      onRenderBody({ form: modalForm, make, makeField }) {
-        titleInput = make("input", "bp-modal-input");
+      onRenderBody({ form: modalForm, makeField }) {
+        titleInput = createEl("input", "bp-modal-input");
         titleInput.type = "text";
         titleInput.maxLength = 40;
         titleInput.placeholder = "例: Google Classroom";
         titleInput.value = card?.title || "";
 
-        urlInput = make("input", "bp-modal-input");
+        urlInput = createEl("input", "bp-modal-input");
         urlInput.type = "text";
         urlInput.inputMode = "url";
         urlInput.maxLength = 2000;
@@ -839,27 +814,27 @@
         modalForm.appendChild(makeField("タイトル", titleInput));
         modalForm.appendChild(makeField("URL", urlInput, "「https://」は省略できます"));
 
-        const iconField = make("div", "bp-modal-field");
-        iconField.appendChild(make("span", "bp-modal-label", "アイコン"));
-        const radioRow = make("div", "bp-modal-radio-row");
+        const iconField = createEl("div", "bp-modal-field");
+        iconField.appendChild(createEl("span", "bp-modal-label", "アイコン"));
+        const radioRow = createEl("div", "bp-modal-radio-row");
         for (const [value, text] of [["default", "デフォルト"], ["emoji", "絵文字"], ["url", "画像URL"]]) {
-          const label = make("label", "bp-modal-radio");
-          const radio = make("input");
+          const label = createEl("label", "bp-modal-radio");
+          const radio = createEl("input");
           radio.type = "radio";
           radio.name = radioName;
           radio.value = value;
           radios[value] = radio;
-          label.append(radio, make("span", null, text));
+          label.append(radio, createEl("span", null, text));
           radioRow.appendChild(label);
         }
         iconField.appendChild(radioRow);
 
-        emojiInput = make("input", "bp-modal-input bp-modal-emoji-input");
+        emojiInput = createEl("input", "bp-modal-input bp-modal-emoji-input");
         emojiInput.type = "text";
         emojiInput.maxLength = 16;
         emojiInput.placeholder = "例: 📚";
 
-        iconUrlInput = make("input", "bp-modal-input");
+        iconUrlInput = createEl("input", "bp-modal-input");
         iconUrlInput.type = "text";
         iconUrlInput.inputMode = "url";
         iconUrlInput.maxLength = 2000;
@@ -873,9 +848,9 @@
         iconField.append(emojiInput, iconUrlInput);
         modalForm.appendChild(iconField);
 
-        const previewField = make("div", "bp-modal-field");
-        previewField.appendChild(make("span", "bp-modal-label", "プレビュー"));
-        previewCard = make("div", "bp-preview-card");
+        const previewField = createEl("div", "bp-modal-field");
+        previewField.appendChild(createEl("span", "bp-modal-label", "プレビュー"));
+        previewCard = createEl("div", "bp-preview-card");
         previewField.appendChild(previewCard);
         modalForm.appendChild(previewField);
       },
@@ -884,13 +859,14 @@
         const url = normalizeUrl(urlInput.value);
         const iconType = getIconType();
         const iconValue = getIconValue(iconType);
+        const normalizedIconUrl = iconType === "url" ? normalizeUrl(iconValue) : null;
 
         let error = "";
         let focusTarget = null;
         if (!title) [error, focusTarget] = ["タイトルを入力してください。", titleInput];
         else if (!url) [error, focusTarget] = ["有効なURL（http:// または https://）を入力してください。", urlInput];
         else if (iconType === "emoji" && !iconValue) [error, focusTarget] = ["絵文字を入力してください。", emojiInput];
-        else if (iconType === "url" && !normalizeUrl(iconValue)) [error, focusTarget] = ["有効な画像URL（http:// または https://）を入力してください。", iconUrlInput];
+        else if (iconType === "url" && !normalizedIconUrl) [error, focusTarget] = ["有効な画像URL（http:// または https://）を入力してください。", iconUrlInput];
         if (error) {
           errEl.textContent = error;
           focusTarget.focus();
@@ -902,7 +878,7 @@
           title,
           url,
           iconType,
-          iconValue: iconType === "url" ? normalizeUrl(iconValue) : iconValue,
+          iconValue: normalizedIconUrl ?? iconValue,
         });
       },
     });
@@ -918,21 +894,16 @@
   }
 
   function createAddCardPlaceholder(settings, onUpdate) {
-    const col = document.createElement("div");
-    col.className = cardTemplate?.className || "";
+    const col = createEl("div", cardTemplate?.className || "");
     col.classList.add("bp-add-card-col");
 
-    const btn = document.createElement("button");
+    const btn = createEl("button", "bp-add-card-btn");
     btn.type = "button";
-    btn.className = "bp-add-card-btn";
     btn.draggable = false;
-    const plus = document.createElement("span");
-    plus.className = "bp-add-card-plus";
-    plus.textContent = "＋";
-    const label = document.createElement("span");
-    label.className = "bp-add-card-label";
-    label.textContent = "新規カードを追加";
-    btn.append(plus, label);
+    btn.append(
+      createEl("span", "bp-add-card-plus", "＋"),
+      createEl("span", "bp-add-card-label", "新規カードを追加")
+    );
 
     btn.addEventListener("click", (e) => {
       e.preventDefault();
@@ -954,11 +925,9 @@
   }
 
   function createButton(className, text, onClick) {
-    const btn = document.createElement("button");
+    const btn = createEl("button", "bp-btn " + className, text);
     btn.type = "button";
-    btn.className = "bp-btn " + className;
     btn.draggable = false;
-    btn.textContent = text;
     btn.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -983,8 +952,7 @@
   function createToggleOverlay(targetEl, cfg, settings, onUpdate) {
     targetEl.querySelector("." + CONSTANTS.CLASSES.TOGGLE_OVERLAY)?.remove();
 
-    const wrapper = document.createElement("div");
-    wrapper.className = CONSTANTS.CLASSES.TOGGLE_OVERLAY;
+    const wrapper = createEl("div", CONSTANTS.CLASSES.TOGGLE_OVERLAY);
 
     const isActive = settings[cfg.key];
     wrapper.appendChild(createButton(
@@ -1034,16 +1002,14 @@
    * カード編集オーバーレイ生成
    * ===================================================================== */
   function createEditOverlay(el, settings, onUpdate) {
-    const overlay = document.createElement("div");
-    overlay.className = CONSTANTS.CLASSES.EDIT_OVERLAY;
+    const overlay = createEl("div", CONSTANTS.CLASSES.EDIT_OVERLAY);
 
     const id = el.id;
     const isHidden = settings.hiddenIds.includes(id);
     const customCard = el.classList.contains(CONSTANTS.CLASSES.CUSTOM_CARD) ? findCustomCard(settings, id) : null;
 
     const createCustomCardButtons = () => {
-      const row = document.createElement("div");
-      row.className = "bp-move-row";
+      const row = createEl("div", "bp-move-row");
       if (!isHidden) {
         row.appendChild(createButton("bp-btn-edit", "編集", () => {
           openCardModal(customCard, (data) => {
@@ -1073,31 +1039,21 @@
         onUpdate();
       }));
 
-      const moveRow = document.createElement("div");
-      moveRow.className = "bp-move-row";
-
-      const upBtn = createButton("bp-btn-up", "▲", () => {
-        const newOrder = OrderLogic.calcMoveOrder(settings.order, settings.hiddenIds, id, -1);
-        if (newOrder) {
+      const moveRow = createEl("div", "bp-move-row");
+      for (const [cls, text, direction, title] of [
+        ["bp-btn-up", "▲", -1, "上に移動"],
+        ["bp-btn-down", "▼", 1, "下に移動"],
+      ]) {
+        const moveBtn = createButton(cls, text, () => {
+          const newOrder = OrderLogic.calcMoveOrder(settings.order, settings.hiddenIds, id, direction);
+          if (!newOrder) return;
           settings.order = newOrder;
           saveSettings(settings);
           onUpdate();
-        }
-      });
-      upBtn.title = "上に移動";
-
-      const downBtn = createButton("bp-btn-down", "▼", () => {
-        const newOrder = OrderLogic.calcMoveOrder(settings.order, settings.hiddenIds, id, 1);
-        if (newOrder) {
-          settings.order = newOrder;
-          saveSettings(settings);
-          onUpdate();
-        }
-      });
-      downBtn.title = "下に移動";
-
-      moveRow.appendChild(upBtn);
-      moveRow.appendChild(downBtn);
+        });
+        moveBtn.title = title;
+        moveRow.appendChild(moveBtn);
+      }
       overlay.appendChild(moveRow);
 
       if (customCard) overlay.appendChild(createCustomCardButtons());
@@ -1200,24 +1156,17 @@
    * 非表示セクション生成
    * ===================================================================== */
   function createHiddenSection(count) {
-    const section = document.createElement("div");
-    section.className = "bp-hidden-section" + (hiddenSectionOpen ? " open" : "");
-    const makeEl = (tag, className, text) => {
-      const el = document.createElement(tag);
-      if (className) el.className = className;
-      if (text != null) el.textContent = String(text);
-      return el;
-    };
+    const section = createEl("div", "bp-hidden-section" + (hiddenSectionOpen ? " open" : ""));
 
-    const header = makeEl("div", "bp-hidden-header");
-    const label = makeEl("span");
+    const header = createEl("div", "bp-hidden-header");
+    const label = createEl("span");
     label.append(
-      makeEl("span", "bp-hidden-title", "非表示の項目"),
-      makeEl("span", "bp-hidden-count", count)
+      createEl("span", "bp-hidden-title", "非表示の項目"),
+      createEl("span", "bp-hidden-count", count)
     );
-    header.append(label, makeEl("span", "bp-hidden-arrow", "▼"));
+    header.append(label, createEl("span", "bp-hidden-arrow", "▼"));
 
-    const body = makeEl("div", "bp-hidden-body");
+    const body = createEl("div", "bp-hidden-body");
     section.append(header, body);
 
     header.addEventListener("click", () => {
@@ -1342,10 +1291,8 @@
   }
 
   function applyFoldGroupState(bar, group, expanded, contentEl = null) {
-    bar.dataset.bpFoldExpanded = expanded ? "1" : "0";
     bar.dataset.bpFoldKey = group.key;
     bar.setAttribute("aria-expanded", expanded ? "true" : "false");
-    bar.classList.toggle("is-expanded", expanded);
 
     const label = bar.querySelector(".bp-notice-fold-label");
     if (label) {
@@ -1365,23 +1312,17 @@
   }
 
   function createFoldBar(group, expanded, isBottomGroup, contentEl) {
-    const bar = document.createElement("button");
+    const bar = createEl("button", CONSTANTS.CLASSES.NOTICE_FOLD_BAR);
     bar.type = "button";
-    bar.className = CONSTANTS.CLASSES.NOTICE_FOLD_BAR;
     bar.dataset.bpFoldAtBottom = isBottomGroup ? "1" : "0";
 
-    const icon = document.createElement("span");
-    icon.className = "bp-notice-fold-icon";
+    const icon = createEl("span", "bp-notice-fold-icon", "▸");
     icon.setAttribute("aria-hidden", "true");
-    icon.textContent = "▸";
 
-    const label = document.createElement("span");
-    label.className = "bp-notice-fold-label";
-
-    bar.append(icon, label);
+    bar.append(icon, createEl("span", "bp-notice-fold-label"));
     applyFoldGroupState(bar, group, expanded, contentEl);
     bar.addEventListener("click", () => {
-      const nextExpanded = bar.dataset.bpFoldExpanded !== "1";
+      const nextExpanded = bar.getAttribute("aria-expanded") !== "true";
       applyFoldGroupState(bar, group, nextExpanded, contentEl);
     });
 
@@ -1398,7 +1339,7 @@
 
     const expandedKeys = new Set();
     for (const oldBar of contentEl.querySelectorAll("." + foldBarClass)) {
-      if (oldBar.dataset.bpFoldExpanded === "1" && oldBar.dataset.bpFoldKey) {
+      if (oldBar.getAttribute("aria-expanded") === "true" && oldBar.dataset.bpFoldKey) {
         expandedKeys.add(oldBar.dataset.bpFoldKey);
       }
       oldBar.remove();
@@ -1437,18 +1378,16 @@
       return;
     }
 
-    const footer = existing || document.createElement("div");
-    footer.className = CONSTANTS.CLASSES.NOTICE_FOOTER;
+    const footer = existing || createEl("div", CONSTANTS.CLASSES.NOTICE_FOOTER);
 
     if (status === "read") {
-      const statusText = document.createElement("span");
-      statusText.className = "bp-notice-footer-status";
-      statusText.textContent = "✓ 確認済み（次回アクセス時は自動で折りたたまれます）";
-
-      const unackBtn = document.createElement("button");
+      const statusText = createEl(
+        "span",
+        "bp-notice-footer-status",
+        "✓ 確認済み（次回アクセス時は自動で折りたたまれます）"
+      );
+      const unackBtn = createEl("button", "bp-notice-unack-btn", "未読に戻す");
       unackBtn.type = "button";
-      unackBtn.className = "bp-notice-unack-btn";
-      unackBtn.textContent = "未読に戻す";
       unackBtn.addEventListener("click", () => {
         settings.readNoticeBlocks = [];
         saveSettings(settings);
@@ -1457,14 +1396,13 @@
 
       footer.replaceChildren(statusText, unackBtn);
     } else {
-      const note = document.createElement("span");
-      note.className = "bp-notice-footer-note";
-      note.textContent = "確認すると次回から折りたたまれます（新着や変更時は自動で再表示）";
-
-      const ackBtn = document.createElement("button");
+      const note = createEl(
+        "span",
+        "bp-notice-footer-note",
+        "確認すると次回から折りたたまれます（新着や変更時は自動で再表示）"
+      );
+      const ackBtn = createEl("button", "bp-notice-ack-btn", "✓ 確認済みにする");
       ackBtn.type = "button";
-      ackBtn.className = "bp-notice-ack-btn";
-      ackBtn.textContent = "✓ 確認済みにする";
       ackBtn.addEventListener("click", () => {
         settings.readNoticeBlocks = [...currentHashes];
         saveSettings(settings);
@@ -1499,9 +1437,6 @@
     } else if (forceCollapse) {
       setNoticeCollapsed(parts, true, { preferBootstrapClick: true });
     }
-
-    parts.noticeEl.classList.toggle(CONSTANTS.CLASSES.NOTICE_READ, state.status === "read");
-    parts.noticeEl.classList.toggle(CONSTANTS.CLASSES.NOTICE_UNREAD, state.status === "unread");
 
     renderNoticeBlockStates(parts.contentEl, blockData, state, settings.readNoticeBlocks);
     renderNoticeBadge(parts.toggleLink, state.status);
@@ -1571,10 +1506,8 @@
   }
 
   function createSettingsButton(settings) {
-    const btn = document.createElement("button");
+    const btn = createEl("button", "bp-settings-btn", "⚙");
     btn.type = "button";
-    btn.className = "bp-settings-btn";
-    btn.textContent = "⚙";
     btn.title = "ポータルを編集";
 
     let resetBtn = null;
@@ -1590,10 +1523,8 @@
       document.body.classList.add(CONSTANTS.CLASSES.EDIT_MODE);
       btn.classList.add("active");
 
-      resetBtn = document.createElement("button");
+      resetBtn = createEl("button", "bp-reset-btn", "設定をリセット");
       resetBtn.type = "button";
-      resetBtn.className = "bp-reset-btn";
-      resetBtn.textContent = "設定をリセット";
       resetBtn.addEventListener("click", () => {
         if (confirm("すべての設定をリセットしますか？\n（作成したオリジナルカードは削除されません）")) {
           const customCards = settings.customCards;
