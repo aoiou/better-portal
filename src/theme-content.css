@@ -674,14 +674,19 @@ html[data-bp-theme="dark"] .bp-modal-option:hover {
   background: rgba(56, 189, 248, 0.06);
 }
 
-html[data-bp-theme="dark"] .bp-modal-option:has(input:checked) {
+html[data-bp-theme="dark"] .bp-modal-option:has(> .bp-modal-option-hit > input:checked) {
   border-color: #38bdf8;
   background: rgba(56, 189, 248, 0.12);
   box-shadow: 0 0 0 1px #38bdf8;
 }
 
-html[data-bp-theme="dark"] .bp-modal-option:has(input:focus-visible) {
+html[data-bp-theme="dark"] .bp-modal-option:has(> .bp-modal-option-hit > input:focus-visible) {
   outline-color: #38bdf8;
+}
+
+html[data-bp-theme="dark"] .bp-modal-option-extra {
+  border-top-color: rgba(56, 189, 248, 0.25);
+  background: rgba(15, 23, 42, 0.45);
 }
 
 html[data-bp-theme="dark"] .bp-modal-option input[type="radio"] {
@@ -694,6 +699,7 @@ html[data-bp-theme="dark"] .bp-modal-option-title {
 
 html[data-bp-theme="dark"] .bp-modal-option-badge {
   background: rgba(56, 189, 248, 0.16);
+  border-color: rgba(56, 189, 248, 0.3);
   color: #7dd3fc;
 }
 
@@ -702,8 +708,18 @@ html[data-bp-theme="dark"] .bp-modal-option-desc {
 }
 
 html[data-bp-theme="dark"] .bp-modal-select {
+  background: rgba(56, 189, 248, 0.16);
+  border-color: rgba(56, 189, 248, 0.35);
+  color: #7dd3fc;
+}
+
+html[data-bp-theme="dark"] .bp-modal-select:hover {
+  background: rgba(56, 189, 248, 0.24);
+  border-color: rgba(56, 189, 248, 0.5);
+}
+
+html[data-bp-theme="dark"] .bp-modal-select option {
   background: #1e293b;
-  border-color: #334155;
   color: #e2e8f0;
 }
 

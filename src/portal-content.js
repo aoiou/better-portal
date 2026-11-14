@@ -114,7 +114,7 @@
       noticeToBottom: false,
       readNoticeBlocks: [],
       m365RedirectUrl: "",
-      m365RedirectMethod: "login_srf",
+      m365RedirectMethod: "domain_hint",
       // オリジナルカード: { id, title, url, iconType: "default" | "emoji" | "url", iconValue }
       customCards: [],
     };
@@ -141,9 +141,7 @@
       m365RedirectUrl: typeof raw.m365RedirectUrl === "string"
         ? (normalizeUrl(raw.m365RedirectUrl) || "")
         : defaults.m365RedirectUrl,
-      m365RedirectMethod: raw.m365RedirectMethod === M365_REDIRECT_METHODS.DOMAIN_HINT
-        ? M365_REDIRECT_METHODS.DOMAIN_HINT
-        : defaults.m365RedirectMethod,
+      m365RedirectMethod: normalizeM365Method(raw.m365RedirectMethod, defaults.m365RedirectMethod),
       customCards: Array.isArray(raw.customCards)
         ? raw.customCards.filter((c) => c && typeof c === "object" && typeof c.id === "string" && typeof c.title === "string")
         : defaults.customCards,
@@ -454,32 +452,33 @@
     {
       id: "default",
       label: "デフォルト",
-      description: "ポータル標準の遷移先を使用",
+      description: "ポータル標準のリンク先を使用",
       url: "",
-      method: M365_REDIRECT_METHODS.LOGIN_SRF,
+      method: M365_REDIRECT_METHODS.DOMAIN_HINT,
     },
     {
       id: "onedrive",
       label: "OneDrive (SharePoint)",
-      description: "https://doshishaacjp-my.sharepoint.com/my",
+      description: "大学のOneDriveを開く",
       url: "https://doshishaacjp-my.sharepoint.com/my",
       method: M365_REDIRECT_METHODS.LOGIN_SRF,
-      badge: "動作確認済",
+      badge: "旧方式",
     },
     {
       id: "outlook",
       label: "Outlook",
-      badge: "動作確認済",
       variants: [
         {
           id: M365_REDIRECT_METHODS.DOMAIN_HINT,
           label: "新方式",
+          description: "ヒントをつけてOutlookを開く",
           url: "https://outlook.cloud.microsoft/mail/",
           method: M365_REDIRECT_METHODS.DOMAIN_HINT,
         },
         {
           id: M365_REDIRECT_METHODS.LOGIN_SRF,
           label: "旧方式",
+          description: "ポータル経由でOutlookを開く",
           url: "https://outlook.office.com/mail/",
           method: M365_REDIRECT_METHODS.LOGIN_SRF,
         },
@@ -488,14 +487,14 @@
   ];
   const M365_METHOD_OPTIONS = [
     {
-      id: M365_REDIRECT_METHODS.LOGIN_SRF,
-      label: "login.srf 方式（標準）",
-      description: "ポータルのデフォルトURL（wreply）を書き換えて遷移",
+      id: M365_REDIRECT_METHODS.DOMAIN_HINT,
+      label: "新方式",
+      description: "ヒントをつけて開く",
     },
     {
-      id: M365_REDIRECT_METHODS.DOMAIN_HINT,
-      label: "?domain_hint= 付与方式",
-      description: `URLに ?domain_hint=${M365_DOMAIN_HINT} を付与して直接開く`,
+      id: M365_REDIRECT_METHODS.LOGIN_SRF,
+      label: "旧方式",
+      description: "ポータル経由で開く",
     },
   ];
 
@@ -515,7 +514,14 @@
     }
   }
 
-  function findM365PresetMatch(url, method = M365_REDIRECT_METHODS.LOGIN_SRF) {
+  function normalizeM365Method(method, fallback = M365_REDIRECT_METHODS.DOMAIN_HINT) {
+    if (method === M365_REDIRECT_METHODS.LOGIN_SRF || method === M365_REDIRECT_METHODS.DOMAIN_HINT) {
+      return method;
+    }
+    return fallback;
+  }
+
+  function findM365PresetMatch(url, method = M365_REDIRECT_METHODS.DOMAIN_HINT) {
     const trimmed = (url || "").trim();
     if (!trimmed) {
       const preset = M365_REDIRECT_PRESETS[0];
@@ -523,9 +529,7 @@
     }
     const normalized = normalizeUrl(trimmed);
     if (!normalized) return null;
-    const normalizedMethod = method === M365_REDIRECT_METHODS.DOMAIN_HINT
-      ? M365_REDIRECT_METHODS.DOMAIN_HINT
-      : M365_REDIRECT_METHODS.LOGIN_SRF;
+    const normalizedMethod = normalizeM365Method(method);
 
     for (const preset of M365_REDIRECT_PRESETS) {
       if (Array.isArray(preset.variants)) {
@@ -590,9 +594,7 @@
 
     const originalOnclick = link.dataset.bpOriginalOnclick;
     const customUrl = settings.m365RedirectUrl?.trim();
-    const method = settings.m365RedirectMethod === M365_REDIRECT_METHODS.DOMAIN_HINT
-      ? M365_REDIRECT_METHODS.DOMAIN_HINT
-      : M365_REDIRECT_METHODS.LOGIN_SRF;
+    const method = normalizeM365Method(settings.m365RedirectMethod);
 
     if (customUrl && method === M365_REDIRECT_METHODS.DOMAIN_HINT) {
       const directUrl = buildM365DomainHintUrl(customUrl);
@@ -738,11 +740,12 @@
   }
 
   function openM365UrlModal(currentUrl, currentMethod, onSave) {
-    const initialMethod = currentMethod === M365_REDIRECT_METHODS.DOMAIN_HINT
-      ? M365_REDIRECT_METHODS.DOMAIN_HINT
-      : M365_REDIRECT_METHODS.LOGIN_SRF;
+    const initialMethod = normalizeM365Method(currentMethod);
     const match = findM365PresetMatch(currentUrl, initialMethod);
     const initialOptionId = match ? match.preset.id : M365_CUSTOM_OPTION_ID;
+    const initialCustomMethod = (!match && currentUrl)
+      ? initialMethod
+      : M365_REDIRECT_METHODS.DOMAIN_HINT;
     const modalToken = generateCustomCardId();
     const destRadioName = "bp-m365-redirect-" + modalToken;
     const methodRadioName = "bp-m365-method-" + modalToken;
@@ -750,18 +753,19 @@
     const methodRadios = {};
     const presetSelects = {};
     let customSection = null;
+    let customDescEl = null;
     let urlInput = null;
 
     const getSelectedOptionId = () =>
       Object.values(destRadios).find((radio) => radio.checked)?.value || "default";
 
     const getSelectedMethod = () =>
-      Object.values(methodRadios).find((radio) => radio.checked)?.value || M365_REDIRECT_METHODS.LOGIN_SRF;
+      Object.values(methodRadios).find((radio) => radio.checked)?.value || M365_REDIRECT_METHODS.DOMAIN_HINT;
 
     const syncCustomSection = () => {
-      if (customSection) {
-        customSection.hidden = getSelectedOptionId() !== M365_CUSTOM_OPTION_ID;
-      }
+      const isCustom = getSelectedOptionId() === M365_CUSTOM_OPTION_ID;
+      if (customSection) customSection.hidden = !isCustom;
+      if (customDescEl) customDescEl.hidden = isCustom;
     };
 
     const createRadioOptionItem = ({
@@ -775,8 +779,12 @@
       initialVariantId,
       radiosMap,
       onPointerSelect,
+      extraContent,
     }) => {
-      const option = createEl("div", "bp-modal-option");
+      const option = createEl(
+        "div",
+        extraContent ? "bp-modal-option bp-modal-option--expandable" : "bp-modal-option"
+      );
       const hitLabel = createEl("label", "bp-modal-option-hit");
       const radio = createEl("input");
       radio.type = "radio";
@@ -788,15 +796,14 @@
       const body = createEl("span", "bp-modal-option-body");
       const header = createEl("span", "bp-modal-option-header");
       header.appendChild(createEl("span", "bp-modal-option-title", title));
-      if (badge) {
-        header.appendChild(createEl("span", "bp-modal-option-badge", badge));
-      }
       body.appendChild(header);
 
       const initialVariant = Array.isArray(variants)
         ? (variants.find((v) => v.id === initialVariantId) || variants[0])
         : null;
-      const descText = initialVariant ? initialVariant.url : description;
+      const descText = initialVariant
+        ? (initialVariant.description || initialVariant.url)
+        : description;
       const descEl = descText ? createEl("span", "bp-modal-option-desc", descText) : null;
       if (descEl) body.appendChild(descEl);
 
@@ -807,6 +814,9 @@
       }
 
       hitLabel.append(radio, body);
+      if (badge) {
+        hitLabel.appendChild(createEl("span", "bp-modal-option-badge", badge));
+      }
       option.appendChild(hitLabel);
 
       if (Array.isArray(variants) && variants.length > 0) {
@@ -820,23 +830,32 @@
         }
         select.addEventListener("change", () => {
           const activeVariant = variants.find((v) => v.id === select.value) || variants[0];
-          if (descEl) descEl.textContent = activeVariant.url;
+          if (descEl) descEl.textContent = activeVariant.description || activeVariant.url;
           radio.checked = true;
         });
         presetSelects[value] = select;
         option.appendChild(select);
       }
 
+      if (extraContent) {
+        option.appendChild(extraContent);
+      }
+
       return option;
     };
 
-    const createRadioGroupField = (labelText, labelId, optionItems) => {
+    const createRadioGroupField = (
+      labelText,
+      labelId,
+      optionItems,
+      listClassName = "bp-modal-option-list"
+    ) => {
       const field = createEl("div", "bp-modal-field");
       const labelEl = createEl("span", "bp-modal-label", labelText);
       labelEl.id = labelId;
       field.appendChild(labelEl);
 
-      const optionList = createEl("div", "bp-modal-option-list");
+      const optionList = createEl("div", listClassName);
       optionList.setAttribute("role", "radiogroup");
       optionList.setAttribute("aria-labelledby", labelId);
       optionItems.forEach((item) => optionList.appendChild(item));
@@ -846,10 +865,72 @@
     };
 
     const { form, errorEl } = createModalFrame({
-      title: "Microsoft365の遷移先設定",
-      ariaLabel: "Microsoft365の遷移先URLを設定",
+      title: "Microsoft365のリンク先設定",
+      ariaLabel: "Microsoft365のリンク先を設定",
       submitText: "保存",
-      onRenderBody({ form: modalForm, makeField }) {
+      onRenderBody({ form: modalForm }) {
+        customSection = createEl("div", "bp-modal-option-extra");
+
+        const urlField = createEl("label", "bp-modal-field");
+        const urlLabelRow = createEl("span", "bp-modal-label-row");
+        urlLabelRow.append(
+          createEl("span", "bp-modal-label", "リンク先URL"),
+          createEl("span", "bp-modal-hint", "「https://」は省略できます")
+        );
+        urlInput = createEl("input", "bp-modal-input");
+        urlInput.type = "text";
+        urlInput.inputMode = "url";
+        urlInput.maxLength = 2000;
+        urlInput.placeholder = "例: https://teams.microsoft.com/";
+        urlInput.value = match ? "" : (currentUrl || "");
+        urlField.append(urlLabelRow, urlInput);
+        customSection.appendChild(urlField);
+
+        const methodOptions = M365_METHOD_OPTIONS.map((opt) =>
+          createRadioOptionItem({
+            name: methodRadioName,
+            value: opt.id,
+            checked: opt.id === initialCustomMethod,
+            title: opt.label,
+            description: opt.description,
+            radiosMap: methodRadios,
+          })
+        );
+        customSection.appendChild(
+          createRadioGroupField(
+            "遷移方式",
+            methodRadioName + "-label",
+            methodOptions,
+            "bp-modal-option-list bp-modal-option-list--grid"
+          )
+        );
+        customSection.appendChild(
+          createEl(
+            "p",
+            "bp-modal-hint bp-modal-extra-note",
+            "URLやサービス、方式によっては正しく開けない場合があります。"
+          )
+        );
+
+        const customOption = createRadioOptionItem({
+          name: destRadioName,
+          value: M365_CUSTOM_OPTION_ID,
+          checked: initialOptionId === M365_CUSTOM_OPTION_ID,
+          title: "その他（カスタムURL）",
+          description: "Teamsなど、お好みのページを指定",
+          radiosMap: destRadios,
+          onPointerSelect() {
+            queueMicrotask(() => {
+              if (destRadios[M365_CUSTOM_OPTION_ID]?.checked) {
+                syncCustomSection();
+                urlInput?.focus();
+              }
+            });
+          },
+          extraContent: customSection,
+        });
+        customDescEl = customOption.querySelector(".bp-modal-option-desc");
+
         const destOptions = [
           ...M365_REDIRECT_PRESETS.map((preset) =>
             createRadioOptionItem({
@@ -864,59 +945,10 @@
               radiosMap: destRadios,
             })
           ),
-          createRadioOptionItem({
-            name: destRadioName,
-            value: M365_CUSTOM_OPTION_ID,
-            checked: initialOptionId === M365_CUSTOM_OPTION_ID,
-            title: "その他（カスタムURL）",
-            description: "任意のURLと遷移方式を指定",
-            radiosMap: destRadios,
-            onPointerSelect() {
-              queueMicrotask(() => {
-                if (destRadios[M365_CUSTOM_OPTION_ID]?.checked) {
-                  syncCustomSection();
-                  urlInput?.focus();
-                }
-              });
-            },
-          }),
+          customOption,
         ];
-        modalForm.appendChild(createRadioGroupField("遷移先", destRadioName + "-label", destOptions));
+        modalForm.appendChild(createRadioGroupField("リンク先", destRadioName + "-label", destOptions));
 
-        customSection = createEl("div", "bp-modal-subsection");
-
-        urlInput = createEl("input", "bp-modal-input");
-        urlInput.type = "text";
-        urlInput.inputMode = "url";
-        urlInput.maxLength = 2000;
-        urlInput.placeholder = "例: https://outlook.cloud.microsoft/mail/";
-        urlInput.value = match ? "" : (currentUrl || "");
-
-        customSection.appendChild(makeField("遷移先URL", urlInput, "「https://」は省略できます。"));
-
-        const methodOptions = M365_METHOD_OPTIONS.map((opt) =>
-          createRadioOptionItem({
-            name: methodRadioName,
-            value: opt.id,
-            checked: opt.id === initialMethod,
-            title: opt.label,
-            description: opt.description,
-            radiosMap: methodRadios,
-          })
-        );
-        customSection.appendChild(
-          createRadioGroupField("リダイレクト方式", methodRadioName + "-label", methodOptions)
-        );
-
-        customSection.appendChild(
-          createEl(
-            "p",
-            "bp-modal-hint bp-modal-subsection-note",
-            "Microsoft側の仕様により、URLや方式によっては正しく遷移しない場合があります。"
-          )
-        );
-
-        modalForm.appendChild(customSection);
         syncCustomSection();
       },
       onSubmit({ errorEl: errEl, closeModal: closeFn }) {
@@ -929,7 +961,7 @@
             const variant = preset.variants.find((v) => v.id === select?.value) || preset.variants[0];
             onSave(variant.url, variant.method);
           } else {
-            onSave(preset ? preset.url : "", preset ? preset.method : M365_REDIRECT_METHODS.LOGIN_SRF);
+            onSave(preset ? preset.url : "", preset ? preset.method : M365_REDIRECT_METHODS.DOMAIN_HINT);
           }
           return;
         }
@@ -1390,9 +1422,7 @@
 
       if (isM365Card(el)) {
         const currentUrl = settings.m365RedirectUrl?.trim() || "";
-        const currentMethod = settings.m365RedirectMethod === M365_REDIRECT_METHODS.DOMAIN_HINT
-          ? M365_REDIRECT_METHODS.DOMAIN_HINT
-          : M365_REDIRECT_METHODS.LOGIN_SRF;
+        const currentMethod = normalizeM365Method(settings.m365RedirectMethod);
         const hasCustomUrl = Boolean(currentUrl);
         const match = hasCustomUrl ? findM365PresetMatch(currentUrl, currentMethod) : null;
         const linkBtn = createButton(
@@ -1409,14 +1439,13 @@
         );
         if (hasCustomUrl) {
           if (match?.variant) {
-            linkBtn.title = `現在の設定: ${match.preset.label} (${match.variant.label} / ${match.variant.url})`;
+            linkBtn.title = `現在の設定: ${match.preset.label}（${match.variant.label}）`;
           } else if (match) {
-            linkBtn.title = `現在の設定: ${match.preset.label} (${currentUrl})`;
+            linkBtn.title = `現在の設定: ${match.preset.label}`;
           } else if (currentMethod === M365_REDIRECT_METHODS.DOMAIN_HINT) {
-            const directUrl = buildM365DomainHintUrl(currentUrl) || currentUrl;
-            linkBtn.title = `現在の設定 (domain_hint方式): ${directUrl}`;
+            linkBtn.title = `現在の設定（新方式）: ${currentUrl}`;
           } else {
-            linkBtn.title = `現在の設定 (login.srf方式): ${currentUrl}`;
+            linkBtn.title = `現在の設定（旧方式）: ${currentUrl}`;
           }
         }
         overlay.appendChild(linkBtn);
