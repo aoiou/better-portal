@@ -24,6 +24,8 @@
     ghost.querySelectorAll("[id]").forEach((n) => n.removeAttribute("id"));
     DomUtils.stripCardEditState(ghost, { stripServiceClass: true });
     ghost.classList.add(CONSTANTS.CLASSES.DRAG_GHOST);
+    ghost.style.position = "fixed";
+    ghost.style.setProperty?.("position", "fixed", "important");
     ghost.style.left = rect.left + "px";
     ghost.style.top = rect.top + "px";
     ghost.style.width = rect.width + "px";
