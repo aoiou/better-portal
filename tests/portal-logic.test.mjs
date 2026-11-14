@@ -167,11 +167,12 @@ test("Storage coalesces concurrent writes, prevents stale sync overwrite after l
   settings.hideSearchBar = true;
   Storage.saveSettings(settings);
 
-  // Hints should update synchronously right away
+  // Hints should update localStorage synchronously without mutating root attributes directly
   const hintsRaw = JSON.parse(lsStore.get(CONSTANTS.HINTS_CACHE_KEY));
   assert.equal(hintsRaw.hs, true);
   assert.equal(hintsRaw.ht, true);
   assert.equal(hintsRaw.hq, true);
+  assert.equal(document.documentElement.getAttribute(CONSTANTS.HINT_ATTRS.HIDE_SUB_NAV), null);
 
   // Release first gate and clear gate for trailing coalesced write
   setSyncSetGate(null);
@@ -345,4 +346,66 @@ test("DomUtils.getVisibleCards and DomUtils.stripCardEditState handle card filte
 
   DomUtils.stripCardEditState(visibleCard, { stripServiceClass: true });
   assert.equal(visibleCard.classList.contains(CONSTANTS.CLASSES.SERVICE_CARD), false);
+});
+
+test("Toggles creates notice anchor lazily only when enabled and reverts/reapplies cleanly", () => {
+  const { BP, document } = createPortalTestEnv();
+  const { Toggles, CONSTANTS } = BP;
+
+  const container = document.createElement("div");
+  container.id = "div-container";
+  const notice = document.createElement("div");
+  notice.id = "PortalComment02";
+  const cardsSection = document.createElement("div");
+  cardsSection.className = "user-account";
+  container.append(notice, cardsSection);
+  document.body.appendChild(container);
+
+  const settings = { noticeToBottom: false };
+
+  // When disabled, applyExtraHides must not inject an unused #bp-notice-anchor
+  Toggles.applyExtraHides(settings);
+  assert.equal(document.getElementById("bp-notice-anchor"), null);
+  assert.deepEqual(Array.from(container.children).map((el) => el.id || el.className), [
+    "PortalComment02",
+    "user-account",
+  ]);
+
+  // Enable and apply -> creates anchor lazily and moves notice to bottom
+  settings.noticeToBottom = true;
+  Toggles.applyExtraHides(settings);
+  assert.ok(document.getElementById("bp-notice-anchor"));
+  assert.ok(notice.classList.contains(CONSTANTS.CLASSES.NOTICE_BOTTOM));
+  assert.equal(container.children[container.children.length - 1], notice);
+
+  // Enter edit mode -> temporarily reverts position & adds overlay button with matching state
+  document.body.classList.add(CONSTANTS.CLASSES.EDIT_MODE);
+  Toggles.setupTogglableElements(settings, (cfg, btn) => {
+    settings[cfg.key] = !settings[cfg.key];
+    Toggles.updateToggleOverlayButton(btn, cfg, settings[cfg.key]);
+  });
+  assert.equal(notice.classList.contains(CONSTANTS.CLASSES.NOTICE_BOTTOM), false);
+  assert.equal(container.children[1], notice);
+
+  const overlayBtn = notice.querySelector("." + CONSTANTS.CLASSES.TOGGLE_OVERLAY + " button");
+  assert.ok(overlayBtn);
+  assert.ok(overlayBtn.classList.contains("bp-btn-show"));
+  assert.equal(overlayBtn.textContent, "お知らせを一番下に移動 を元に戻す");
+
+  // Toggle off inside edit mode -> updates button state and keeps reverted on cleanup
+  overlayBtn.click();
+  assert.ok(overlayBtn.classList.contains("bp-btn-hide"));
+  assert.equal(overlayBtn.textContent, "お知らせを一番下に移動");
+
+  document.body.classList.remove(CONSTANTS.CLASSES.EDIT_MODE);
+  Toggles.cleanupTogglableElements(settings);
+  assert.equal(notice.querySelector("." + CONSTANTS.CLASSES.TOGGLE_OVERLAY), null);
+  assert.equal(notice.classList.contains(CONSTANTS.CLASSES.NOTICE_BOTTOM), false);
+  assert.equal(container.children[1], notice);
+
+  // Re-enable and cleanup -> moves back to bottom
+  settings.noticeToBottom = true;
+  Toggles.cleanupTogglableElements(settings);
+  assert.ok(notice.classList.contains(CONSTANTS.CLASSES.NOTICE_BOTTOM));
+  assert.equal(container.children[container.children.length - 1], notice);
 });

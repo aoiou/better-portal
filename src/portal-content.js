@@ -26,7 +26,6 @@
   let hiddenSectionRef = null;
   let addCardCol = null;
   let dragController = null;
-  let portalCards = [];
   const customCardById = new Map();
   const cardById = new Map();
 
@@ -49,20 +48,16 @@
     }
   }
 
-  function ensureHiddenSection(count) {
+  function ensureHiddenSection() {
     if (hiddenSectionRef && hiddenSectionRef.section.isConnected) {
-      const countEl = hiddenSectionRef.section.querySelector(".bp-hidden-count");
-      if (countEl) countEl.textContent = String(count);
       return hiddenSectionRef;
     }
 
     const section = DomUtils.createEl("div", "bp-hidden-section" + (hiddenSectionOpen ? " open" : ""));
     const header = DomUtils.createEl("div", "bp-hidden-header");
+    const countEl = DomUtils.createEl("span", "bp-hidden-count", "0");
     const label = DomUtils.createEl("span");
-    label.append(
-      DomUtils.createEl("span", "bp-hidden-title", "非表示の項目"),
-      DomUtils.createEl("span", "bp-hidden-count", count)
-    );
+    label.append(DomUtils.createEl("span", "bp-hidden-title", "非表示の項目"), countEl);
     header.append(label, DomUtils.createEl("span", "bp-hidden-arrow", "▼"));
 
     const body = DomUtils.createEl("div", "bp-hidden-body");
@@ -74,7 +69,7 @@
     });
 
     mainRow.parentElement.appendChild(section);
-    hiddenSectionRef = { section, body };
+    hiddenSectionRef = { section, body, countEl };
     return hiddenSectionRef;
   }
 
@@ -85,8 +80,7 @@
       hiddenSectionRef.section.remove();
       hiddenSectionRef = null;
     } else {
-      const countEl = hiddenSectionRef.section.querySelector(".bp-hidden-count");
-      if (countEl) countEl.textContent = String(count);
+      hiddenSectionRef.countEl.textContent = String(count);
     }
   }
 
@@ -141,7 +135,7 @@
     delete el.dataset.bpDraggable;
     refreshCardOverlay(el, settings, settingsBtn);
 
-    const { body } = ensureHiddenSection(0);
+    const { body } = ensureHiddenSection();
     insertCardInOrder(body, el, settings.order);
     syncHiddenSectionEmptyState();
 
@@ -171,14 +165,9 @@
     refreshCardOverlay(el, settings, settingsBtn);
 
     const visibleBefore = DomUtils.getVisibleCards(mainRow);
-    DomUtils.flipAnimateElements(
-      mainRow,
-      visibleBefore,
-      () => {
-        insertCardInOrder(mainRow, el, settings.order, addCardCol);
-      },
-      { excludeEl: el }
-    );
+    DomUtils.flipAnimateElements(mainRow, visibleBefore, () => {
+      insertCardInOrder(mainRow, el, settings.order, addCardCol);
+    });
 
     if (hadFocus) {
       el.querySelector(".bp-btn-hide")?.focus({ preventScroll: true });
@@ -330,7 +319,7 @@
   function renderFullLayout(settings) {
     dragController?.cancel();
 
-    portalCards = [...document.querySelectorAll(CONSTANTS.SELECTOR.SERVICE_CARDS)];
+    const portalCards = [...document.querySelectorAll(CONSTANTS.SELECTOR.SERVICE_CARDS)];
     if (mainRow && portalCards.length > 0) {
       if (!cardTemplate) cardTemplate = CustomCards.createCardTemplate(portalCards[0]);
       if (!Array.isArray(settings.customCards)) settings.customCards = [];
@@ -351,8 +340,6 @@
       if (hiddenSectionRef) {
         hiddenSectionRef.section.remove();
         hiddenSectionRef = null;
-      } else {
-        mainRow.parentElement.querySelector(".bp-hidden-section")?.remove();
       }
       addCardCol?.remove();
 
@@ -375,13 +362,14 @@
       mainRow.replaceChildren(visibleFragment);
 
       if (hiddenCards.length > 0) {
-        const { body } = ensureHiddenSection(hiddenCards.length);
+        const { body } = ensureHiddenSection();
         const hiddenFragment = document.createDocumentFragment();
         for (const el of hiddenCards) {
           el.classList.add(CONSTANTS.CLASSES.HIDDEN_ITEM);
           hiddenFragment.appendChild(el);
         }
         body.appendChild(hiddenFragment);
+        syncHiddenSectionEmptyState();
       }
 
       // bp-onclick-change を window までバブリングさせるため、全カードをDOM配置した後に適用する
@@ -399,7 +387,7 @@
 
     if (!dragController) {
       dragController = DragDrop.initDragAndDrop({
-        getMainRow: () => mainRow,
+        mainRow,
         onOrderCommit(finalVisibleOrder) {
           const newOrder = OrderLogic.calcReorderFromVisible(
             settings.order,

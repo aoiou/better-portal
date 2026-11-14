@@ -61,16 +61,16 @@
     link.href = safeUrl;
     link.title = safeUrl;
 
+    let currentIcon = link.querySelector(".bp-custom-icon, .service-thumb-img");
     const nextIconKey = getIconKey(card);
     if (el.dataset.bpIconKey !== nextIconKey) {
       el.dataset.bpIconKey = nextIconKey;
       const icon = createIconElement(card.iconType, card.iconValue);
-      const oldIcon = link.querySelector(".bp-custom-icon, .service-thumb-img");
-      if (oldIcon) oldIcon.replaceWith(icon);
+      if (currentIcon) currentIcon.replaceWith(icon);
       else link.prepend(icon);
+      currentIcon = icon;
     }
 
-    const currentIcon = link.querySelector(".bp-custom-icon, .service-thumb-img");
     let label = [...link.querySelectorAll("span")].find((s) => !currentIcon || !currentIcon.contains(s));
     if (!label) {
       label = document.createElement("span");
@@ -268,7 +268,6 @@
 
   BP.CustomCards = {
     findCustomCard,
-    createIconElement,
     createCardTemplate,
     createCustomCardElement,
     updateCustomCardElement,

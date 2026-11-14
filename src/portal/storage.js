@@ -113,9 +113,6 @@
         next[cfg.hintKey] = Boolean(settings[cfg.key]);
       }
       writeHintsCache(next);
-      if (!document.body?.classList.contains(CONSTANTS.CLASSES.READY)) {
-        applyHintsToRoot(next);
-      }
     },
 
     setNoticeCollapsed(collapsed) {
@@ -231,7 +228,6 @@
   BP.Storage = {
     Hints,
     getDefaultSettings,
-    normalizeSettings,
     preloadSettings,
     loadSettings,
     saveSettings,

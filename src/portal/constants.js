@@ -97,19 +97,18 @@
       showLabel: "お知らせを一番下に移動 を元に戻す",
       hideLabel: "お知らせを一番下に移動",
       apply(el, active) {
-        if (!document.getElementById("bp-notice-anchor")) {
-          const anchor = document.createElement("span");
-          anchor.id = "bp-notice-anchor";
-          anchor.hidden = true;
-          el.before(anchor);
-        }
         el.classList.toggle(CONSTANTS.CLASSES.NOTICE_BOTTOM, Boolean(active));
-        if (active) document.getElementById("div-container")?.appendChild(el);
-        else document.getElementById("bp-notice-anchor")?.after(el);
-      },
-      revert(el, active) {
-        el.classList.remove(CONSTANTS.CLASSES.NOTICE_BOTTOM);
-        if (active) document.getElementById("bp-notice-anchor")?.after(el);
+        if (active) {
+          if (!document.getElementById("bp-notice-anchor")) {
+            const anchor = document.createElement("span");
+            anchor.id = "bp-notice-anchor";
+            anchor.hidden = true;
+            el.before(anchor);
+          }
+          document.getElementById("div-container")?.appendChild(el);
+        } else {
+          document.getElementById("bp-notice-anchor")?.after(el);
+        }
       },
     },
   ];

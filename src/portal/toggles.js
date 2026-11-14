@@ -4,17 +4,16 @@
   const BP = (globalThis.BetterPortal = globalThis.BetterPortal || {});
   const { CONSTANTS, TOGGLE_CONFIG, DomUtils } = BP;
 
-  function applyToggleElement(cfg, settings) {
-    const el = cfg.find();
-    if (!el) return;
-    if (cfg.apply) cfg.apply(el, settings[cfg.key]);
-    else el.style.display = settings[cfg.key] ? "none" : "";
+  function applyToggleState(cfg, el, active) {
+    if (cfg.apply) cfg.apply(el, active);
+    else el.style.display = active ? "none" : "";
   }
 
   function applyExtraHides(settings) {
     if (document.body.classList.contains(CONSTANTS.CLASSES.EDIT_MODE)) return;
     for (const cfg of TOGGLE_CONFIG) {
-      applyToggleElement(cfg, settings);
+      const el = cfg.find();
+      if (el) applyToggleState(cfg, el, Boolean(settings[cfg.key]));
     }
   }
 
@@ -28,12 +27,8 @@
     targetEl.querySelector("." + CONSTANTS.CLASSES.TOGGLE_OVERLAY)?.remove();
 
     const wrapper = DomUtils.createEl("div", CONSTANTS.CLASSES.TOGGLE_OVERLAY);
-    const active = Boolean(settings[cfg.key]);
-    const btn = DomUtils.createButton(
-      active ? "bp-btn-show" : "bp-btn-hide",
-      active ? cfg.showLabel : cfg.hideLabel,
-      () => onToggle(cfg, btn)
-    );
+    const btn = DomUtils.createButton("", "", () => onToggle(cfg, btn));
+    updateToggleOverlayButton(btn, cfg, settings[cfg.key]);
     wrapper.appendChild(btn);
 
     if (!("bpPrevPosition" in targetEl.dataset)) {
@@ -47,8 +42,7 @@
     for (const cfg of TOGGLE_CONFIG) {
       const el = cfg.find();
       if (!el) continue;
-      if (cfg.revert) cfg.revert(el, settings[cfg.key]);
-      else if (settings[cfg.key]) el.style.display = "";
+      if (settings[cfg.key]) applyToggleState(cfg, el, false);
       createToggleOverlay(el, cfg, settings, onToggle);
     }
   }
@@ -66,7 +60,6 @@
   }
 
   BP.Toggles = {
-    applyToggleElement,
     applyExtraHides,
     updateToggleOverlayButton,
     setupTogglableElements,

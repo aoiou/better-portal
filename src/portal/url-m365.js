@@ -195,7 +195,6 @@
   BP.UrlM365 = {
     M365_REDIRECT_METHODS,
     M365_METHOD_LABELS,
-    M365_DOMAIN_HINT,
     M365_CUSTOM_OPTION_ID,
     M365_REDIRECT_PRESETS,
     M365_METHOD_OPTIONS,
@@ -204,7 +203,6 @@
     findM365PresetMatch,
     buildM365DomainHintUrl,
     isM365Card,
-    replaceOnclickUrl,
     buildM365Onclick,
     applyM365Redirect,
   };

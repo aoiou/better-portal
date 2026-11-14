@@ -32,7 +32,14 @@
     return ghost;
   }
 
-  function initDragAndDrop({ getMainRow, onOrderCommit }) {
+  function initDragAndDrop({ mainRow, onOrderCommit }) {
+    if (!mainRow) {
+      return {
+        cancel() {},
+        isDragging: () => false,
+      };
+    }
+
     const MOVE_THRESHOLD_PX = 5;
     const TOUCH_HOLD_MS = 240;
     const TOUCH_CANCEL_MOVE_PX = 8;
@@ -46,7 +53,7 @@
     let suppressClickTimer = null;
 
     function queryVisibleCards() {
-      return DomUtils.getVisibleCards(getMainRow());
+      return DomUtils.getVisibleCards(mainRow);
     }
 
     function refreshVisibleCards(activeState) {
@@ -66,7 +73,7 @@
       };
     }
 
-    function measureAddColRect(mainRow, rowRect) {
+    function measureAddColRect(rowRect) {
       const addCol = mainRow.querySelector(".bp-add-card-col");
       return addCol && addCol.offsetParent !== null
         ? toRowRelativeRect(addCol.getBoundingClientRect(), rowRect)
@@ -82,8 +89,7 @@
       cards = activeState?.visibleCards || queryVisibleCards(),
       premeasuredRects = null
     ) {
-      const mainRow = getMainRow();
-      if (!mainRow || !activeState) return;
+      if (!activeState) return;
       const rowRect = mainRow.getBoundingClientRect();
       activeState.rowRect = rowRect;
       activeState.layoutRects.clear();
@@ -91,7 +97,7 @@
         const rect = premeasuredRects?.get(card) || card.getBoundingClientRect();
         activeState.layoutRects.set(card, toRowRelativeRect(rect, rowRect));
       }
-      activeState.addColRect = measureAddColRect(mainRow, rowRect);
+      activeState.addColRect = measureAddColRect(rowRect);
     }
 
     function isInRect(px, py, rect) {
@@ -103,8 +109,7 @@
       const fromIndex = cards.indexOf(activeState.cardEl);
       if (fromIndex < 0) return null;
 
-      const rowRect = activeState.rowRect || getMainRow()?.getBoundingClientRect();
-      if (!rowRect) return null;
+      const rowRect = activeState.rowRect || mainRow.getBoundingClientRect();
       const px = clientX - rowRect.left;
       const py = clientY - rowRect.top;
 
@@ -170,8 +175,6 @@
     }
 
     function applyFlipReorder(activeState, applyDomChange) {
-      const mainRow = getMainRow();
-      if (!mainRow) return;
       DomUtils.flipAnimateElements(mainRow, activeState.visibleCards, applyDomChange, {
         excludeEl: activeState.cardEl,
         durationMs: 220,
@@ -211,8 +214,6 @@
     }
 
     function restoreInitialOrderWithFlip(activeState) {
-      const mainRow = getMainRow();
-      if (!mainRow) return;
       const currentCards = refreshVisibleCards(activeState);
       const currentIds = currentCards.map((el) => el.id);
       if (isSameOrder(currentIds, activeState.initialVisibleOrder)) {
@@ -284,8 +285,7 @@
         const prevScrollY = window.scrollY;
         window.scrollBy(0, dy);
         if (window.scrollY !== prevScrollY) {
-          const mainRow = getMainRow();
-          if (mainRow) activeState.rowRect = mainRow.getBoundingClientRect();
+          activeState.rowRect = mainRow.getBoundingClientRect();
           tryReorderAtPointer(activeState);
         }
         activeState.scrollRaf = requestAnimationFrame(step);
@@ -308,17 +308,23 @@
       updateAutoScroll(activeState);
     }
 
-    function detachGlobalListeners() {
-      window.removeEventListener("pointermove", onPointerMove);
-      window.removeEventListener("pointerup", onPointerUp);
-      window.removeEventListener("pointercancel", onPointerCancel);
-      window.removeEventListener("keydown", onKeydown, true);
-      window.removeEventListener("blur", onWindowBlur);
-      window.removeEventListener("resize", onWindowResize);
+    const GLOBAL_LISTENERS = [
+      ["pointermove", onPointerMove],
+      ["pointerup", onPointerUp],
+      ["pointercancel", onPointerCancel],
+      ["keydown", onKeydown, true],
+      ["blur", onWindowBlur],
+      ["resize", onWindowResize],
+    ];
+
+    function setGlobalListeners(attach) {
+      const method = attach ? "addEventListener" : "removeEventListener";
+      for (const [type, handler, capture] of GLOBAL_LISTENERS) {
+        window[method](type, handler, capture);
+      }
     }
 
     function cleanupVisualState(activeState) {
-      const mainRow = getMainRow();
       stopAutoScroll(activeState);
       stopMoveRaf(activeState);
       if (activeState.holdTimer) {
@@ -338,11 +344,11 @@
         activeState.slotEl = null;
       }
       activeState.cardEl.classList.remove(CONSTANTS.CLASSES.DRAG_PLACEHOLDER, CONSTANTS.CLASSES.DRAG_SETTLING);
-      mainRow?.classList.remove(CONSTANTS.CLASSES.IS_DRAGGING);
+      mainRow.classList.remove(CONSTANTS.CLASSES.IS_DRAGGING);
       document.body.classList.remove(CONSTANTS.CLASSES.DRAG_ACTIVE);
 
       try {
-        if (mainRow?.hasPointerCapture?.(activeState.pointerId)) {
+        if (mainRow.hasPointerCapture?.(activeState.pointerId)) {
           mainRow.releasePointerCapture(activeState.pointerId);
         }
       } catch {
@@ -356,8 +362,7 @@
     }
 
     function beginDrag(activeState) {
-      const mainRow = getMainRow();
-      if (!activeState || activeState.dragging || !mainRow) return;
+      if (!activeState || activeState.dragging) return;
       if (!document.body.classList.contains(CONSTANTS.CLASSES.EDIT_MODE)) {
         abortState();
         return;
@@ -413,7 +418,6 @@
 
     function finishDrag(cancelled) {
       const activeState = state;
-      const mainRow = getMainRow();
       if (!activeState) return;
 
       if (!activeState.dragging) {
@@ -425,7 +429,7 @@
 
       stopAutoScroll(activeState);
       stopMoveRaf(activeState);
-      detachGlobalListeners();
+      setGlobalListeners(false);
 
       if (cancelled) {
         restoreInitialOrderWithFlip(activeState);
@@ -434,7 +438,7 @@
       }
 
       // 着地直前に周辺カードのディミングを戻し、着地枠への収束を強調する
-      mainRow?.classList.remove(CONSTANTS.CLASSES.IS_DRAGGING);
+      mainRow.classList.remove(CONSTANTS.CLASSES.IS_DRAGGING);
       document.body.classList.remove(CONSTANTS.CLASSES.DRAG_ACTIVE);
 
       const finalVisibleOrder = refreshVisibleCards(activeState).map((el) => el.id);
@@ -483,7 +487,7 @@
       const activeState = state;
       if (!activeState) return;
       state = null;
-      detachGlobalListeners();
+      setGlobalListeners(false);
       if (activeState.dragging && !activeState.settling) {
         restoreInitialOrderWithFlip(activeState);
       }
@@ -550,17 +554,8 @@
       }
     }
 
-    const row = getMainRow();
-    if (!row) {
-      return {
-        cancel() {},
-        isDragging: () => false,
-      };
-    }
-
-    row.addEventListener("pointerdown", (e) => {
-      const currentRow = getMainRow();
-      if (state || !currentRow) return;
+    mainRow.addEventListener("pointerdown", (e) => {
+      if (state) return;
       if (e.pointerType !== "touch" && e.button !== 0) return;
       if (!document.body.classList.contains(CONSTANTS.CLASSES.EDIT_MODE)) return;
 
@@ -569,7 +564,7 @@
       if (targetEl.closest("button, a, input, select, .bp-btn")) return;
 
       const cardEl = targetEl.closest("." + CONSTANTS.CLASSES.SERVICE_CARD);
-      if (!cardEl || cardEl.parentElement !== currentRow) return;
+      if (!cardEl || cardEl.parentElement !== mainRow) return;
       if (cardEl.classList.contains(CONSTANTS.CLASSES.HIDDEN_ITEM)) return;
       if (cardEl.dataset.bpDraggable !== "1") return;
 
@@ -612,15 +607,10 @@
         }, TOUCH_HOLD_MS);
       }
 
-      window.addEventListener("pointermove", onPointerMove);
-      window.addEventListener("pointerup", onPointerUp);
-      window.addEventListener("pointercancel", onPointerCancel);
-      window.addEventListener("keydown", onKeydown, true);
-      window.addEventListener("blur", onWindowBlur);
-      window.addEventListener("resize", onWindowResize);
+      setGlobalListeners(true);
     });
 
-    row.addEventListener(
+    mainRow.addEventListener(
       "click",
       (e) => {
         if (!suppressNextClick) return;
