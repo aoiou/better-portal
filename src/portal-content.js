@@ -569,14 +569,37 @@
            originalOnclick.includes("login.microsoftonline.com");
   }
 
-  function buildM365Onclick(originalOnclick, inputUrl) {
-    const targetUrl = normalizeUrl(inputUrl);
-    if (!targetUrl || !originalOnclick) return originalOnclick;
-    if (/^https?:\/\/login\.microsoftonline\.com\//i.test(targetUrl) || !/[?&]wreply=/i.test(originalOnclick)) {
-      const escaped = targetUrl.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
-      return originalOnclick.replace(/https?:\/\/[^'"]+/i, () => escaped);
+  function replaceOnclickUrl(originalOnclick, targetUrl) {
+    const quotedUrlPattern = /(['"])https?:\/\/(?:\\.|(?!\1).)*\1/i;
+    const quotedMatch = originalOnclick.match(quotedUrlPattern);
+    if (quotedMatch) {
+      const quote = quotedMatch[1];
+      const escaped = targetUrl.replace(/\\/g, "\\\\").replaceAll(quote, `\\${quote}`);
+      return originalOnclick.replace(quotedUrlPattern, () => `${quote}${escaped}${quote}`);
     }
-    return originalOnclick.replace(/([?&]wreply=)[^'&"]+/i, (_match, p1) => p1 + encodeURIComponent(targetUrl));
+    const escaped = targetUrl.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+    return originalOnclick.replace(/https?:\/\/[^'"]+/i, () => escaped);
+  }
+
+  function buildM365Onclick(originalOnclick, inputUrl, method = M365_REDIRECT_METHODS.DOMAIN_HINT) {
+    if (!originalOnclick) return originalOnclick;
+    const normalizedMethod = normalizeM365Method(method);
+    const targetUrl = normalizedMethod === M365_REDIRECT_METHODS.DOMAIN_HINT
+      ? buildM365DomainHintUrl(inputUrl)
+      : normalizeUrl(inputUrl);
+    if (!targetUrl) return originalOnclick;
+
+    if (
+      normalizedMethod === M365_REDIRECT_METHODS.DOMAIN_HINT ||
+      /^https?:\/\/login\.microsoftonline\.com\//i.test(targetUrl) ||
+      !/[?&]wreply=/i.test(originalOnclick)
+    ) {
+      return replaceOnclickUrl(originalOnclick, targetUrl);
+    }
+    return originalOnclick.replace(
+      /([?&]wreply=)[^'&"]+/i,
+      (_match, p1) => p1 + encodeURIComponent(targetUrl)
+    );
   }
 
   function applyM365Redirect(el, settings) {
@@ -586,48 +609,15 @@
 
     if (!("bpOriginalOnclick" in link.dataset)) {
       link.dataset.bpOriginalOnclick = link.getAttribute("onclick") || "";
-      link.dataset.bpOriginalHref = link.getAttribute("href") ?? "";
-      link.dataset.bpOriginalTarget = link.getAttribute("target") ?? "";
-      link.dataset.bpOriginalRel = link.getAttribute("rel") ?? "";
-      link.dataset.bpOriginalTitle = link.getAttribute("title") ?? "";
     }
 
     const originalOnclick = link.dataset.bpOriginalOnclick;
-    const customUrl = settings.m365RedirectUrl?.trim();
-    const method = normalizeM365Method(settings.m365RedirectMethod);
-
-    if (customUrl && method === M365_REDIRECT_METHODS.DOMAIN_HINT) {
-      const directUrl = buildM365DomainHintUrl(customUrl);
-      if (directUrl) {
-        link.setAttribute("href", directUrl);
-        link.setAttribute("target", "_blank");
-        link.setAttribute("rel", "noopener noreferrer");
-        link.setAttribute("title", directUrl);
-        if (link.hasAttribute("onclick") || link.dataset.bpAppliedMode !== method) {
-          link.dataset.bpOnclick = "";
-          link.dispatchEvent(new CustomEvent(CONSTANTS.EVENTS.ONCLICK_CHANGE, { bubbles: true }));
-        }
-        link.dataset.bpAppliedMode = method;
-        return;
-      }
-    }
-
-    if (link.dataset.bpAppliedMode === M365_REDIRECT_METHODS.DOMAIN_HINT) {
-      const restoreAttr = (attr, value) => {
-        if (value) link.setAttribute(attr, value);
-        else link.removeAttribute(attr);
-      };
-      restoreAttr("href", link.dataset.bpOriginalHref);
-      restoreAttr("target", link.dataset.bpOriginalTarget);
-      restoreAttr("rel", link.dataset.bpOriginalRel);
-      restoreAttr("title", link.dataset.bpOriginalTitle);
-    }
-    link.dataset.bpAppliedMode = M365_REDIRECT_METHODS.LOGIN_SRF;
-
     if (!originalOnclick) return;
 
+    const customUrl = settings.m365RedirectUrl?.trim();
+    const method = normalizeM365Method(settings.m365RedirectMethod);
     const targetOnclick = customUrl
-      ? buildM365Onclick(originalOnclick, customUrl)
+      ? buildM365Onclick(originalOnclick, customUrl, method)
       : originalOnclick;
 
     if (link.getAttribute("onclick") !== targetOnclick) {
@@ -1107,9 +1097,7 @@
     const target = e.target instanceof Element ? e.target : e.target?.parentElement;
     if (!target) return;
     if (target.closest("." + CONSTANTS.CLASSES.EDIT_OVERLAY)) return;
-    const link = target.closest(
-      `.${CONSTANTS.CLASSES.CUSTOM_CARD} a.service-thumb, a.service-thumb[data-bp-applied-mode="${M365_REDIRECT_METHODS.DOMAIN_HINT}"]`
-    );
+    const link = target.closest("." + CONSTANTS.CLASSES.CUSTOM_CARD + " a.service-thumb");
     if (!link) return;
     e.stopImmediatePropagation();
     if (document.body.classList.contains(CONSTANTS.CLASSES.EDIT_MODE)) {
@@ -1843,7 +1831,6 @@
         el.querySelector("." + CONSTANTS.CLASSES.EDIT_OVERLAY)?.remove();
         el.classList.remove(CONSTANTS.CLASSES.HIDDEN_ITEM);
         el.removeAttribute("draggable");
-        applyM365Redirect(el, settings);
       }
 
       mainRow.replaceChildren();
@@ -1872,6 +1859,11 @@
           body.appendChild(el);
         }
         mainRow.parentElement.appendChild(section);
+      }
+
+      // bp-onclick-change を window までバブリングさせるため、全カードをDOM配置した後に適用する
+      for (const el of portalCards) {
+        applyM365Redirect(el, settings);
       }
     }
 

@@ -15,12 +15,10 @@
 
     link.setAttribute("onclick", onclick);
 
-    const match = onclick.match(/doPortal\(\s*(['"])((?:\\\1|(?!\1).)*)\1\s*\)/);
+    const match = onclick.match(/doPortal\(\s*(['"])((?:\\.|(?!\1).)*)\1\s*\)/);
     if (match) {
-      const quote = match[1];
       const rawUrl = match[2];
-      const unescapedQuote = new RegExp(`\\\\${quote}`, "g");
-      const url = rawUrl.replace(unescapedQuote, quote).replace(/\\\\/g, "\\");
+      const url = rawUrl.replace(/\\(.)/g, "$1");
       link.onclick = function () {
         if (typeof window.doPortal === "function") {
           return window.doPortal(url);
