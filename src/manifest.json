@@ -86,6 +86,17 @@
         "https://doshisha.ex-tic.com/idm/user/*"
       ],
       "js": [
+        "portal/constants.js",
+        "portal/dom-utils.js",
+        "portal/order-logic.js",
+        "portal/url-m365.js",
+        "portal/storage.js",
+        "portal/notice-logic.js",
+        "portal/m365-modal.js",
+        "portal/custom-cards.js",
+        "portal/toggles.js",
+        "portal/notice-controller.js",
+        "portal/drag-drop.js",
         "portal-content.js"
       ],
       "css": [

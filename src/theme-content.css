@@ -778,6 +778,10 @@ html[data-bp-theme="dark"] .bp-modal-error {
   color: #f87171;
 }
 
+html[data-bp-theme="dark"] .bp-btn:focus-visible {
+  outline-color: #38bdf8;
+}
+
 html[data-bp-theme="dark"] .bp-btn-cancel {
   background: #475569;
 }

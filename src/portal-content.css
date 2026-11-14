@@ -1,5 +1,18 @@
 /* Better Portal - Content Styles */
 
+/* Pre-paint hints cached in localStorage to eliminate CLS before DOMContentLoaded */
+html[data-bp-hide-navbar="1"] body:not(.bp-edit-mode) nav.navbar,
+html[data-bp-hide-subnav="1"] body:not(.bp-edit-mode) .sub-nav,
+html[data-bp-hide-title="1"] body:not(.bp-edit-mode) .page-title,
+html[data-bp-hide-search="1"] body:not(.bp-edit-mode) .row:has(#filterValue),
+html[data-bp-notice-bottom="1"] body:not(.bp-ready) #PortalComment02 {
+  display: none !important;
+}
+
+html[data-bp-notice-collapsed="1"] body:not(.bp-ready) #PortalComment02 .card-body.collapse {
+  display: none !important;
+}
+
 /* Hide elements until extension finishes layout to prevent flicker */
 [id^="div-"][class*="col-"]:has(.service-thumb-wrap),
 nav.navbar,
@@ -103,6 +116,11 @@ body.bp-edit-mode .service-thumb-wrap {
 
 .bp-btn:hover {
   opacity: 0.85;
+}
+
+.bp-btn:focus-visible {
+  outline: 2px solid #6f2c91;
+  outline-offset: 2px;
 }
 
 .bp-btn-hide {
@@ -797,6 +815,13 @@ body.bp-edit-mode .bp-add-card-col {
   overflow-wrap: anywhere;
 }
 
+.bp-modal-message {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: inherit;
+}
+
 .bp-modal-error {
   margin: 0;
   min-height: 1em;
@@ -820,6 +845,10 @@ body.bp-edit-mode .bp-add-card-col {
 
 .bp-btn-save {
   background: #6f2c91;
+}
+
+.bp-btn-danger {
+  background: #d9534f;
 }
 
 /* =====================================================================

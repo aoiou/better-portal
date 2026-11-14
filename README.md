@@ -137,7 +137,19 @@
 │   ├── theme-content.js           # 外観テーマ（ダークモード）連動・即時反映スクリプト
 │   ├── theme-content.css          # 各ページ共通・専用ダークモードスタイル
 │   ├── auth-content.js            # ログイン・認証画面 (/auth/*) 自動入力スクリプト
-│   ├── portal-content.js          # ポータル・アカウント管理画面 (/idm/user/*) カスタマイズスクリプト
+│   ├── portal/                    # ポータル画面カスタマイズモジュール群
+│   │   ├── constants.js           # 定数・セレクタ・トグル設定
+│   │   ├── dom-utils.js           # DOM生成・FLIPアニメーション・モーダル基盤
+│   │   ├── order-logic.js         # カード並び順計算（純粋ロジック）
+│   │   ├── url-m365.js            # URL検証・Microsoft 365 リダイレクト書換
+│   │   ├── storage.js             # ストレージ永続化・先読み・描画ヒントキャッシュ
+│   │   ├── notice-logic.js        # お知らせ差分検知・折りたたみグループ算出
+│   │   ├── m365-modal.js          # Microsoft 365 リンク先設定モーダル
+│   │   ├── custom-cards.js        # オリジナルカード生成・編集モーダル
+│   │   ├── toggles.js             # ナビバー・検索欄等の表示切替制御
+│   │   ├── notice-controller.js   # お知らせDOM状態・既読折りたたみ制御
+│   │   └── drag-drop.js           # Pointer Events + FLIP 並び替え制御
+│   ├── portal-content.js          # ポータル画面 (/idm/user/*) オーケストレータ
 │   ├── portal-content.css         # ポータルカスタマイズ・編集UI用スタイル
 │   ├── portal-page.js             # ポータル画面 MAIN world スクリプト（M365リンク書換）
 │   ├── popup.html                 # ポップアップ設定画面UI
