@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import { SRC_DIR } from "./helpers/test-helpers.mjs";
+import { SRC_DIR, getPortalScriptList } from "./helpers/test-helpers.mjs";
 
 test("manifest.json is valid and all referenced assets exist in src/", () => {
   const manifestPath = path.join(SRC_DIR, "manifest.json");
@@ -26,6 +26,10 @@ test("manifest.json is valid and all referenced assets exist in src/", () => {
       assert.ok(fs.existsSync(path.join(SRC_DIR, cssFile)), `Missing content CSS: ${cssFile}`);
     }
   }
+
+  const portalScripts = getPortalScriptList(true);
+  assert.ok(portalScripts.length >= 2);
+  assert.equal(portalScripts[portalScripts.length - 1], "portal/content.js");
 });
 
 test("all JavaScript files under src/ pass Node syntax check", () => {

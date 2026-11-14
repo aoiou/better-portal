@@ -66,7 +66,7 @@ function buildMockPortalDom(doc) {
   doc.body.append(nav, container);
 }
 
-test("portal-content applies pre-paint hints, initializes lazily without edit overlays, and handles incremental edit actions", async () => {
+test("portal/content.js applies pre-paint hints, initializes lazily without edit overlays, and handles incremental edit actions", async () => {
   const env = createPortalTestEnv({
     localStorageInitial: {
       "bp-portal-hints": JSON.stringify({ hn: true, nb: true, nc: false }),
@@ -157,7 +157,7 @@ test("portal-content applies pre-paint hints, initializes lazily without edit ov
   assert.equal(document.querySelector("nav.navbar").style.display, "");
 });
 
-test("portal-content handles custom card add/edit/delete, M365 modal, notice ack/unack, and toggle updates incrementally", async () => {
+test("portal/content.js handles custom card add/edit/delete, M365 modal, notice ack/unack, and toggle updates incrementally", async () => {
   const env = createPortalTestEnv({
     syncInitial: {
       betterPortalSettings: {
@@ -245,7 +245,7 @@ test("portal-content handles custom card add/edit/delete, M365 modal, notice ack
   assert.equal(syncStore.get(CONSTANTS.STORAGE_KEY).hideNavbar, true);
 });
 
-test("portal-content works cleanly on non-portal /idm/user/* subpages and when loaded during document_start", async () => {
+test("portal/content.js works cleanly on non-portal /idm/user/* subpages and when loaded during document_start", async () => {
   const env = createPortalTestEnv({
     localStorageInitial: {
       "bp-portal-hints": JSON.stringify({ hn: true }),

@@ -134,10 +134,16 @@
 ├── src/                           # 拡張機能ソースコード（読み込み対象）
 │   ├── manifest.json              # 拡張機能の設定・権限定義 (Manifest V3)
 │   ├── background.js              # バックグラウンドスクリプト（ショートカット起動等）
-│   ├── theme-content.js           # 外観テーマ（ダークモード）連動・即時反映スクリプト
-│   ├── theme-content.css          # 各ページ共通・専用ダークモードスタイル
-│   ├── auth-content.js            # ログイン・認証画面 (/auth/*) 自動入力スクリプト
-│   ├── portal/                    # ポータル画面カスタマイズモジュール群
+│   ├── auth/                      # ログイン・認証自動化 (/auth/*)
+│   │   └── content.js             # ログイン・認証画面自動入力スクリプト
+│   ├── theme/                     # 外観テーマ（ダークモード）制御
+│   │   ├── content.js             # テーマ連動・即時反映スクリプト
+│   │   └── content.css            # 各ページ共通・専用ダークモードスタイル
+│   ├── popup/                     # ポップアップ設定画面
+│   │   ├── index.html             # ポップアップ設定画面UI
+│   │   ├── index.css              # ポップアップ設定画面スタイル
+│   │   └── index.js               # ポップアップ設定画面ロジック・ストレージ保存連携
+│   ├── portal/                    # ポータル画面カスタマイズ (/idm/user/*)
 │   │   ├── constants.js           # 定数・セレクタ・トグル設定
 │   │   ├── dom-utils.js           # DOM生成・FLIPアニメーション・モーダル基盤
 │   │   ├── order-logic.js         # カード並び順計算（純粋ロジック）
@@ -148,13 +154,10 @@
 │   │   ├── custom-cards.js        # オリジナルカード生成・編集モーダル
 │   │   ├── toggles.js             # ナビバー・検索欄等の表示切替制御
 │   │   ├── notice-controller.js   # お知らせDOM状態・既読折りたたみ制御
-│   │   └── drag-drop.js           # Pointer Events + FLIP 並び替え制御
-│   ├── portal-content.js          # ポータル画面 (/idm/user/*) オーケストレータ
-│   ├── portal-content.css         # ポータルカスタマイズ・編集UI用スタイル
-│   ├── portal-page.js             # ポータル画面 MAIN world スクリプト（M365リンク書換）
-│   ├── popup.html                 # ポップアップ設定画面UI
-│   ├── popup.css                  # ポップアップ設定画面スタイル
-│   ├── popup.js                   # ポップアップ設定画面ロジック・ストレージ保存連携
+│   │   ├── drag-drop.js           # Pointer Events + FLIP 並び替え制御
+│   │   ├── content.js             # ポータル画面オーケストレータ
+│   │   ├── content.css            # ポータルカスタマイズ・編集UI用スタイル
+│   │   └── page.js                # ポータル画面 MAIN world スクリプト（M365リンク書換）
 │   └── icons/                     # 拡張機能アイコン画像
 │       ├── icon16.png
 │       ├── icon48.png

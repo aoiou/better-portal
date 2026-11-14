@@ -44,7 +44,7 @@
   --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* ダークテーマ変数（popup.js が data-theme を常に resolved 値にセットするため @media 不要） */
+/* ダークテーマ変数（popup/index.js が data-theme を常に resolved 値にセットするため @media 不要） */
 :root[data-theme="dark"] {
   --bg-main: #0f172a;
   --bg-card: #1e293b;

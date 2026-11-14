@@ -7,6 +7,26 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = path.resolve(__dirname, "../..");
 export const SRC_DIR = path.join(REPO_ROOT, "src");
 
+const PORTAL_ENTRY_SCRIPT = "portal/content.js";
+
+/**
+ * Read the portal content script load order from src/manifest.json so tests
+ * share a single source of truth with the extension manifest.
+ */
+export function getPortalScriptList(includeMain = true) {
+  const manifestPath = path.join(SRC_DIR, "manifest.json");
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+  const portalContentScript = (manifest.content_scripts || []).find(
+    (cs) => cs.world !== "MAIN" && Array.isArray(cs.js) && cs.js.includes(PORTAL_ENTRY_SCRIPT)
+  );
+  if (!portalContentScript) {
+    throw new Error(`Could not find ${PORTAL_ENTRY_SCRIPT} content_scripts entry in src/manifest.json`);
+  }
+  return includeMain
+    ? [...portalContentScript.js]
+    : portalContentScript.js.filter((rel) => rel !== PORTAL_ENTRY_SCRIPT);
+}
+
 function splitOutsideParens(str, delimiterRe) {
   const parts = [];
   let parenDepth = 0;
@@ -730,22 +750,7 @@ export function createPortalTestEnv({
   });
   context.globalThis = context;
 
-  const scripts = [
-    "portal/constants.js",
-    "portal/dom-utils.js",
-    "portal/order-logic.js",
-    "portal/url-m365.js",
-    "portal/storage.js",
-    "portal/notice-logic.js",
-    "portal/m365-modal.js",
-    "portal/custom-cards.js",
-    "portal/toggles.js",
-    "portal/notice-controller.js",
-    "portal/drag-drop.js",
-  ];
-  if (includeMain) {
-    scripts.push("portal-content.js");
-  }
+  const scripts = getPortalScriptList(includeMain);
 
   if (setupDom) {
     setupDom(doc);

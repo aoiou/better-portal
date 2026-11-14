@@ -21,7 +21,7 @@
     "128": "icons/icon128.png"
   },
   "action": {
-    "default_popup": "popup.html",
+    "default_popup": "popup/index.html",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
@@ -55,10 +55,10 @@
         "https://doshisha.ex-tic.com/imgmtx/*"
       ],
       "js": [
-        "theme-content.js"
+        "theme/content.js"
       ],
       "css": [
-        "theme-content.css"
+        "theme/content.css"
       ],
       "run_at": "document_start"
     },
@@ -67,7 +67,7 @@
         "https://doshisha.ex-tic.com/auth/*"
       ],
       "js": [
-        "auth-content.js"
+        "auth/content.js"
       ],
       "run_at": "document_start"
     },
@@ -76,7 +76,7 @@
         "https://doshisha.ex-tic.com/idm/user/portal/*"
       ],
       "js": [
-        "portal-page.js"
+        "portal/page.js"
       ],
       "world": "MAIN",
       "run_at": "document_start"
@@ -97,10 +97,10 @@
         "portal/toggles.js",
         "portal/notice-controller.js",
         "portal/drag-drop.js",
-        "portal-content.js"
+        "portal/content.js"
       ],
       "css": [
-        "portal-content.css"
+        "portal/content.css"
       ],
       "run_at": "document_start"
     }
