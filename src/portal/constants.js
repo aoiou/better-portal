@@ -25,6 +25,8 @@
       DROP_SLOT_ENTER: "bp-drop-slot--entering",
       DROP_SLOT_ICON: "bp-drop-slot-icon",
       EDIT_OVERLAY: "bp-edit-overlay",
+      EDIT_CONTROLS: "bp-edit-controls",
+      EDIT_ROW: "bp-edit-row",
       TOGGLE_OVERLAY: "bp-toggle-overlay",
       NOTICE_BADGE: "bp-notice-badge",
       NOTICE_FOOTER: "bp-notice-footer",

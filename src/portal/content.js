@@ -212,6 +212,8 @@
 
   function createEditOverlay(el, settings, settingsBtn) {
     const overlay = DomUtils.createEl("div", CONSTANTS.CLASSES.EDIT_OVERLAY);
+    const controls = DomUtils.createEl("div", CONSTANTS.CLASSES.EDIT_CONTROLS);
+    overlay.appendChild(controls);
     const id = el.id;
     const isHidden = settings.hiddenIds.includes(id);
     const customCard = el.classList.contains(CONSTANTS.CLASSES.CUSTOM_CARD)
@@ -239,17 +241,20 @@
       return row;
     };
 
+    const mainRowGroup = DomUtils.createEl("div", CONSTANTS.CLASSES.EDIT_ROW);
+    controls.appendChild(mainRowGroup);
+
     if (isHidden) {
-      overlay.appendChild(
+      mainRowGroup.appendChild(
         DomUtils.createButton("bp-btn-show", "表示する", () => {
           showCard(el, settings, settingsBtn);
         })
       );
-      if (customCard) overlay.appendChild(createCustomCardButtons());
+      if (customCard) mainRowGroup.appendChild(createCustomCardButtons());
       return overlay;
     }
 
-    overlay.appendChild(
+    mainRowGroup.appendChild(
       DomUtils.createButton("bp-btn-hide", "非表示にする", () => {
         hideCard(el, settings, settingsBtn);
       })
@@ -266,9 +271,9 @@
       moveBtn.title = title;
       moveRow.appendChild(moveBtn);
     }
-    overlay.appendChild(moveRow);
+    mainRowGroup.appendChild(moveRow);
 
-    if (customCard) overlay.appendChild(createCustomCardButtons());
+    if (customCard) controls.appendChild(createCustomCardButtons());
 
     if (UrlM365.isM365Card(el)) {
       const currentUrl = settings.m365RedirectUrl?.trim() || "";
@@ -298,7 +303,7 @@
           ? `現在の設定: ${match.preset.label}${match.variant ? `（${match.variant.label}）` : ""}`
           : `現在の設定（${UrlM365.M365_METHOD_LABELS[currentMethod]}）: ${currentUrl}`;
       }
-      overlay.appendChild(linkBtn);
+      controls.appendChild(linkBtn);
     }
 
     return overlay;

@@ -109,6 +109,18 @@ test("portal/content.js applies pre-paint hints, initializes lazily without edit
 
   assert.ok(document.body.classList.contains(CONSTANTS.CLASSES.EDIT_MODE));
   assert.equal(document.querySelectorAll("." + CONSTANTS.CLASSES.EDIT_OVERLAY).length, 3);
+  assert.equal(
+    document.querySelectorAll("." + CONSTANTS.CLASSES.EDIT_OVERLAY + " ." + CONSTANTS.CLASSES.EDIT_CONTROLS).length,
+    3
+  );
+  assert.equal(
+    document.querySelectorAll("." + CONSTANTS.CLASSES.EDIT_CONTROLS + " ." + CONSTANTS.CLASSES.EDIT_ROW).length,
+    3
+  );
+  const m365Controls = document.querySelector("#div-2 ." + CONSTANTS.CLASSES.EDIT_CONTROLS);
+  assert.equal(m365Controls.children.length, 2);
+  assert.ok(m365Controls.children[0].classList.contains(CONSTANTS.CLASSES.EDIT_ROW));
+  assert.ok(m365Controls.children[1].classList.contains("bp-btn-link"));
   assert.ok(document.querySelector(".bp-add-card-col"));
 
   // 3. Move div-1 down via ▼ button and verify focus stays on the same button!
@@ -378,6 +390,28 @@ test("drag-and-drop commits reordered cards immediately even when exiting edit m
   const overlay1 = document.querySelector("#div-1 .bp-edit-overlay");
   assert.ok(overlay1);
 
+  // Pointerdown on an action button inside .bp-edit-controls must not initiate drag
+  const hideBtn1 = overlay1.querySelector("." + CONSTANTS.CLASSES.EDIT_CONTROLS + " .bp-btn-hide");
+  assert.ok(hideBtn1);
+  hideBtn1.dispatchEvent({
+    type: "pointerdown",
+    bubbles: true,
+    button: 0,
+    pointerId: 99,
+    pointerType: "mouse",
+    clientX: 20,
+    clientY: 20,
+    preventDefault() {},
+  });
+  window.dispatchEvent({
+    type: "pointermove",
+    pointerId: 99,
+    pointerType: "mouse",
+    clientX: 120,
+    clientY: 20,
+  });
+  assert.equal(document.querySelector(".bp-drag-ghost"), null);
+
   overlay1.dispatchEvent({
     type: "pointerdown",
     bubbles: true,
@@ -396,6 +430,11 @@ test("drag-and-drop commits reordered cards immediately even when exiting edit m
     clientX: 170,
     clientY: 50,
   });
+
+  const ghostDuringDrag = document.querySelector(".bp-drag-ghost");
+  assert.ok(ghostDuringDrag);
+  assert.equal(ghostDuringDrag.querySelector("." + CONSTANTS.CLASSES.EDIT_OVERLAY), null);
+  assert.equal(ghostDuringDrag.querySelector("." + CONSTANTS.CLASSES.EDIT_CONTROLS), null);
 
   await new Promise((r) => setTimeout(r, 5));
 
