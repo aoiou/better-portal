@@ -95,15 +95,14 @@
    * FLIP アニメーション付きで DOM 変更を実行する共通ヘルパー。
    * 連続操作による途中状態も現在矩形から滑らかに補間し、終了後にインラインスタイルを解放する。
    */
+  const FLIP_DURATION_MS = 220;
+
   function flipAnimateElements(container, elements, mutateDom, {
     excludeEl = null,
-    reducedMotion = prefersReducedMotion(),
-    transition = "transform 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 180ms ease",
-    durationMs = 240,
     getNextElements = () => elements,
     onAfterMeasure = null,
   } = {}) {
-    if (!container || reducedMotion) {
+    if (!container || prefersReducedMotion()) {
       mutateDom();
       onAfterMeasure?.(getNextElements(), null);
       return;
@@ -157,7 +156,7 @@
     for (const el of moved) {
       const token = ++flipTokenSeq;
       flipTokenMap.set(el, token);
-      el.style.transition = transition;
+      el.style.transition = `transform ${FLIP_DURATION_MS}ms cubic-bezier(0.22, 1, 0.36, 1), opacity 180ms ease`;
       el.style.transform = "";
 
       const clearIfCurrent = () => {
@@ -176,7 +175,7 @@
         },
         { once: true }
       );
-      setTimeout(clearIfCurrent, durationMs + 60);
+      setTimeout(clearIfCurrent, FLIP_DURATION_MS + 60);
     }
   }
 
@@ -201,7 +200,6 @@
     ariaLabel,
     submitText,
     submitClassName = "bp-btn-save",
-    cancelText = "キャンセル",
     onRenderBody,
     onSubmit,
   }) {
@@ -234,7 +232,7 @@
     form.appendChild(errorEl);
 
     const actions = createEl("div", "bp-modal-actions");
-    const cancelBtn = createEl("button", "bp-btn bp-btn-cancel", cancelText);
+    const cancelBtn = createEl("button", "bp-btn bp-btn-cancel", "キャンセル");
     cancelBtn.type = "button";
     const saveBtn = createEl("button", `bp-btn ${submitClassName}`, submitText || "保存");
     saveBtn.type = "submit";
@@ -303,7 +301,6 @@
     title,
     message,
     confirmText = "確認",
-    cancelText = "キャンセル",
     danger = false,
     onConfirm,
   }) {
@@ -311,7 +308,6 @@
       title,
       submitText: confirmText,
       submitClassName: danger ? "bp-btn-danger" : "bp-btn-save",
-      cancelText,
       onRenderBody({ form }) {
         for (const line of String(message).split("\n")) {
           if (line) {

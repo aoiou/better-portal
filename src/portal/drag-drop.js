@@ -36,7 +36,6 @@
     if (!mainRow) {
       return {
         cancel() {},
-        isDragging: () => false,
       };
     }
 
@@ -177,7 +176,6 @@
     function applyFlipReorder(activeState, applyDomChange) {
       DomUtils.flipAnimateElements(mainRow, activeState.visibleCards, applyDomChange, {
         excludeEl: activeState.cardEl,
-        durationMs: 220,
         getNextElements: () => refreshVisibleCards(activeState),
         onAfterMeasure: (nextCards, lastRects) => {
           cacheLayoutRects(activeState, nextCards, lastRects);
@@ -444,6 +442,10 @@
       const finalVisibleOrder = refreshVisibleCards(activeState).map((el) => el.id);
       const orderChanged = !cancelled && !isSameOrder(finalVisibleOrder, activeState.initialVisibleOrder);
 
+      if (orderChanged) {
+        onOrderCommit(finalVisibleOrder);
+      }
+
       let settled = false;
       const completeSettle = () => {
         if (settled) return;
@@ -454,10 +456,6 @@
         suppressClickTimer = setTimeout(() => {
           suppressNextClick = false;
         }, 50);
-
-        if (orderChanged) {
-          onOrderCommit(finalVisibleOrder);
-        }
       };
 
       if (DomUtils.prefersReducedMotion() || !activeState.ghostEl) {
@@ -475,11 +473,15 @@
       activeState.ghostEl.offsetHeight;
       activeState.ghostEl.style.transform = `translate3d(${settleDx}px, ${settleDy}px, 0)`;
 
-      activeState.ghostEl.addEventListener("transitionend", (e) => {
-        if (e.target === activeState.ghostEl && e.propertyName === "transform") {
-          completeSettle();
-        }
-      });
+      activeState.ghostEl.addEventListener(
+        "transitionend",
+        (e) => {
+          if (e.target === activeState.ghostEl && e.propertyName === "transform") {
+            completeSettle();
+          }
+        },
+        { once: true }
+      );
       activeState.settleTimer = setTimeout(completeSettle, 200);
     }
 
@@ -492,6 +494,10 @@
         restoreInitialOrderWithFlip(activeState);
       }
       cleanupVisualState(activeState);
+      if (suppressClickTimer) {
+        clearTimeout(suppressClickTimer);
+        suppressClickTimer = null;
+      }
       suppressNextClick = false;
     }
 
@@ -624,9 +630,6 @@
     return {
       cancel() {
         abortState();
-      },
-      isDragging() {
-        return Boolean(state?.dragging);
       },
     };
   }

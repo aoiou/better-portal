@@ -26,7 +26,6 @@
   let hiddenSectionRef = null;
   let addCardCol = null;
   let dragController = null;
-  const customCardById = new Map();
   const cardById = new Map();
 
   function insertCardInOrder(container, el, orderedIds, trailingEl = null) {
@@ -184,7 +183,6 @@
       settings.customCards = settings.customCards.filter((c) => c.id !== customCard.id);
       settings.order = settings.order.filter((oid) => oid !== id);
       settings.hiddenIds = settings.hiddenIds.filter((hid) => hid !== id);
-      customCardById.delete(customCard.id);
       cardById.delete(id);
 
       if (isHidden) {
@@ -307,13 +305,11 @@
   }
 
   function getOrCreateCustomCardElement(card) {
-    const existing = customCardById.get(card.id);
+    const existing = cardById.get(CONSTANTS.CUSTOM_ID_PREFIX + card.id);
     if (existing) {
       return CustomCards.updateCustomCardElement(existing, card);
     }
-    const created = CustomCards.createCustomCardElement(card, cardTemplate);
-    if (created) customCardById.set(card.id, created);
-    return created;
+    return CustomCards.createCustomCardElement(card, cardTemplate);
   }
 
   function renderFullLayout(settings) {

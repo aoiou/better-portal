@@ -279,3 +279,151 @@ test("portal/content.js works cleanly on non-portal /idm/user/* subpages and whe
   assert.equal(document.querySelector("nav.navbar").style.display, "none");
   assert.ok(document.querySelector(".bp-settings-btn"));
 });
+
+test("custom card DOM element and image are reused across Reset", async () => {
+  const env = createPortalTestEnv({
+    syncInitial: {
+      betterPortalSettings: {
+        customCards: [
+          {
+            id: "c1",
+            title: "Docs",
+            url: "https://example.com/docs",
+            iconType: "url",
+            iconValue: "https://example.com/icon.png",
+          },
+        ],
+        order: ["bp-custom-c1", "div-1", "div-2", "div-3"],
+      },
+    },
+    includeMain: true,
+    setupDom: buildMockPortalDom,
+  });
+
+  await new Promise((r) => setTimeout(r, 15));
+
+  const { document, syncStore, BP } = env;
+  const { CONSTANTS } = BP;
+  const mainRow = document.querySelector(CONSTANTS.SELECTOR.SERVICE_ROW);
+  const customCardBefore = document.querySelector("#bp-custom-c1");
+  const imgBefore = customCardBefore?.querySelector("img.bp-card-image");
+
+  assert.ok(customCardBefore);
+  assert.ok(imgBefore);
+  assert.deepEqual(
+    mainRow.children
+      .filter((el) => el.classList.contains(CONSTANTS.CLASSES.SERVICE_CARD))
+      .map((el) => el.id),
+    ["bp-custom-c1", "div-1", "div-2", "div-3"]
+  );
+
+  document.querySelector(".bp-settings-btn").click();
+  document.querySelector(".bp-reset-btn").click();
+
+  const modalForm = document.querySelector(".bp-modal-form");
+  assert.ok(modalForm);
+  modalForm.dispatchEvent({ type: "submit", preventDefault() {} });
+
+  await new Promise((r) => setTimeout(r, 15));
+
+  const customCardAfter = document.querySelector("#bp-custom-c1");
+  const imgAfter = customCardAfter?.querySelector("img.bp-card-image");
+
+  assert.equal(customCardAfter, customCardBefore);
+  assert.equal(imgAfter, imgBefore);
+  assert.deepEqual(
+    mainRow.children
+      .filter((el) => el.classList.contains(CONSTANTS.CLASSES.SERVICE_CARD))
+      .map((el) => el.id),
+    ["div-1", "div-2", "div-3", "bp-custom-c1"]
+  );
+  assert.deepEqual(Array.from(syncStore.get(CONSTANTS.STORAGE_KEY).order), [
+    "div-1",
+    "div-2",
+    "div-3",
+    "bp-custom-c1",
+  ]);
+});
+
+test("drag-and-drop commits reordered cards immediately even when exiting edit mode during settle", async () => {
+  const env = createPortalTestEnv({
+    includeMain: true,
+    setupDom: buildMockPortalDom,
+  });
+
+  await new Promise((r) => setTimeout(r, 15));
+
+  const { document, window, syncStore, BP } = env;
+  const { CONSTANTS } = BP;
+  const mainRow = document.querySelector(CONSTANTS.SELECTOR.SERVICE_ROW);
+
+  mainRow.getBoundingClientRect = () => ({
+    left: 0,
+    top: 0,
+    right: 300,
+    bottom: 100,
+    width: 300,
+    height: 100,
+  });
+  for (const card of mainRow.children) {
+    card.getBoundingClientRect = () => {
+      const idx = mainRow.children.indexOf(card);
+      const left = idx * 100;
+      return { left, top: 0, right: left + 100, bottom: 100, width: 100, height: 100 };
+    };
+  }
+
+  document.querySelector(".bp-settings-btn").click();
+
+  const overlay1 = document.querySelector("#div-1 .bp-edit-overlay");
+  assert.ok(overlay1);
+
+  overlay1.dispatchEvent({
+    type: "pointerdown",
+    bubbles: true,
+    button: 0,
+    pointerId: 1,
+    pointerType: "mouse",
+    clientX: 50,
+    clientY: 50,
+    preventDefault() {},
+  });
+
+  window.dispatchEvent({
+    type: "pointermove",
+    pointerId: 1,
+    pointerType: "mouse",
+    clientX: 170,
+    clientY: 50,
+  });
+
+  await new Promise((r) => setTimeout(r, 5));
+
+  window.dispatchEvent({
+    type: "pointerup",
+    pointerId: 1,
+    pointerType: "mouse",
+    clientX: 170,
+    clientY: 50,
+  });
+
+  // Exit edit mode immediately during the settle window
+  document.querySelector(".bp-settings-btn").click();
+
+  assert.equal(document.body.classList.contains(CONSTANTS.CLASSES.EDIT_MODE), false);
+  assert.equal(document.querySelector(".bp-drag-ghost"), null);
+  assert.equal(document.querySelector(".bp-drop-slot"), null);
+  assert.deepEqual(
+    mainRow.children
+      .filter((el) => el.classList.contains(CONSTANTS.CLASSES.SERVICE_CARD))
+      .map((el) => el.id),
+    ["div-2", "div-1", "div-3"]
+  );
+
+  await new Promise((r) => setTimeout(r, 15));
+  assert.deepEqual(Array.from(syncStore.get(CONSTANTS.STORAGE_KEY)?.order || []), [
+    "div-2",
+    "div-1",
+    "div-3",
+  ]);
+});
