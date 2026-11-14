@@ -7,7 +7,6 @@
   let preloadedPromise = null;
   let activeSavePromise = null;
   let queuedSnapshot = null;
-  let lifecycleFlushBound = false;
 
   function cloneSettings(settings) {
     return {
@@ -107,14 +106,11 @@
       applyHintsToRoot(readHintsCache());
     },
 
-    sync(settings, noticeCollapsed) {
+    sync(settings) {
       const prev = readHintsCache() || {};
       const next = { ...prev };
       for (const cfg of TOGGLE_CONFIG) {
         next[cfg.hintKey] = Boolean(settings[cfg.key]);
-      }
-      if (typeof noticeCollapsed === "boolean") {
-        next.nc = noticeCollapsed;
       }
       writeHintsCache(next);
       if (!document.body?.classList.contains(CONSTANTS.CLASSES.READY)) {
@@ -207,17 +203,6 @@
     return preloadSettings();
   }
 
-  function bindLifecycleFlush() {
-    if (lifecycleFlushBound) return;
-    lifecycleFlushBound = true;
-    window.addEventListener("pagehide", flushPendingSave);
-    document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "hidden") {
-        flushPendingSave();
-      }
-    });
-  }
-
   async function drainSaveQueue() {
     try {
       while (queuedSnapshot) {
@@ -234,18 +219,10 @@
     }
   }
 
-  function saveSettings(settings, { noticeCollapsed } = {}) {
-    bindLifecycleFlush();
-    Hints.sync(settings, noticeCollapsed);
+  function saveSettings(settings) {
+    Hints.sync(settings);
     queuedSnapshot = cloneSettings(settings);
     if (!activeSavePromise) {
-      activeSavePromise = drainSaveQueue();
-    }
-    return activeSavePromise;
-  }
-
-  function flushPendingSave() {
-    if (queuedSnapshot && !activeSavePromise) {
       activeSavePromise = drainSaveQueue();
     }
     return activeSavePromise;
@@ -258,7 +235,6 @@
     preloadSettings,
     loadSettings,
     saveSettings,
-    flushPendingSave,
     resetPreloadForTest() {
       preloadedPromise = null;
       activeSavePromise = null;

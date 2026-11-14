@@ -4,10 +4,6 @@
   const BP = (globalThis.BetterPortal = globalThis.BetterPortal || {});
   const { CONSTANTS, TOGGLE_CONFIG, DomUtils } = BP;
 
-  function findServiceRow() {
-    return document.querySelector(CONSTANTS.SELECTOR.SERVICE_ROW);
-  }
-
   function applyToggleElement(cfg, settings) {
     const el = cfg.find();
     if (!el) return;
@@ -70,7 +66,6 @@
   }
 
   BP.Toggles = {
-    findServiceRow,
     applyToggleElement,
     applyExtraHides,
     updateToggleOverlayButton,

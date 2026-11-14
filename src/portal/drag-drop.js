@@ -2,7 +2,7 @@
   "use strict";
 
   const BP = (globalThis.BetterPortal = globalThis.BetterPortal || {});
-  const { CONSTANTS, DomUtils, CustomCards } = BP;
+  const { CONSTANTS, DomUtils } = BP;
 
   function createDropSlotElement() {
     const slot = DomUtils.createEl("div", CONSTANTS.CLASSES.DROP_SLOT);
@@ -22,7 +22,7 @@
     const ghost = cardEl.cloneNode(true);
     ghost.removeAttribute("id");
     ghost.querySelectorAll("[id]").forEach((n) => n.removeAttribute("id"));
-    CustomCards.stripCardEditState(ghost, { stripServiceClass: true });
+    DomUtils.stripCardEditState(ghost, { stripServiceClass: true });
     ghost.classList.add(CONSTANTS.CLASSES.DRAG_GHOST);
     ghost.style.left = rect.left + "px";
     ghost.style.top = rect.top + "px";
@@ -41,26 +41,12 @@
     const SCROLL_ZONE_PX = 80;
     const MAX_SCROLL_SPEED = 14;
 
-    const motionQuery = window.matchMedia?.("(prefers-reduced-motion: reduce)");
-    const prefersReducedMotion = () => Boolean(motionQuery?.matches);
-
     let state = null;
     let suppressNextClick = false;
     let suppressClickTimer = null;
 
     function queryVisibleCards() {
-      const mainRow = getMainRow();
-      if (!mainRow) return [];
-      const cards = [];
-      for (const el of mainRow.children) {
-        if (
-          el.classList.contains(CONSTANTS.CLASSES.SERVICE_CARD) &&
-          !el.classList.contains(CONSTANTS.CLASSES.HIDDEN_ITEM)
-        ) {
-          cards.push(el);
-        }
-      }
-      return cards;
+      return DomUtils.getVisibleCards(getMainRow());
     }
 
     function refreshVisibleCards(activeState) {
@@ -188,7 +174,6 @@
       if (!mainRow) return;
       DomUtils.flipAnimateElements(mainRow, activeState.visibleCards, applyDomChange, {
         excludeEl: activeState.cardEl,
-        reducedMotion: prefersReducedMotion(),
         durationMs: 220,
         getNextElements: () => refreshVisibleCards(activeState),
         onAfterMeasure: (nextCards, lastRects) => {
@@ -215,6 +200,14 @@
       activeState.lastSwapPartner = partner || refNode;
       activeState.lastSwapAt = performance.now();
       return true;
+    }
+
+    /**
+     * 最新ポインター位置に応じた移動先が見つかった場合にカードをFLIP付きで入れ替える。
+     */
+    function tryReorderAtPointer(activeState) {
+      const target = findTargetIndex(activeState, activeState.lastClientX, activeState.lastClientY);
+      if (target) moveCardWithFlip(activeState, target.index, target.partner);
     }
 
     function restoreInitialOrderWithFlip(activeState) {
@@ -293,8 +286,7 @@
         if (window.scrollY !== prevScrollY) {
           const mainRow = getMainRow();
           if (mainRow) activeState.rowRect = mainRow.getBoundingClientRect();
-          const target = findTargetIndex(activeState, activeState.lastClientX, activeState.lastClientY);
-          if (target) moveCardWithFlip(activeState, target.index, target.partner);
+          tryReorderAtPointer(activeState);
         }
         activeState.scrollRaf = requestAnimationFrame(step);
       };
@@ -312,10 +304,7 @@
     function applyDragPointerFrame(activeState) {
       if (!state || state !== activeState || !activeState.dragging || activeState.settling) return;
       updateGhostPosition(activeState, activeState.lastClientX, activeState.lastClientY);
-      const target = findTargetIndex(activeState, activeState.lastClientX, activeState.lastClientY);
-      if (target) {
-        moveCardWithFlip(activeState, target.index, target.partner);
-      }
+      tryReorderAtPointer(activeState);
       updateAutoScroll(activeState);
     }
 
@@ -392,7 +381,7 @@
       activeState.ghostEl = ghost;
 
       const slot = createDropSlotElement();
-      if (!prefersReducedMotion()) {
+      if (!DomUtils.prefersReducedMotion()) {
         slot.classList.add(CONSTANTS.CLASSES.DROP_SLOT_ENTER);
         slot.addEventListener(
           "animationend",
@@ -441,8 +430,7 @@
       if (cancelled) {
         restoreInitialOrderWithFlip(activeState);
       } else {
-        const target = findTargetIndex(activeState, activeState.lastClientX, activeState.lastClientY);
-        if (target) moveCardWithFlip(activeState, target.index, target.partner);
+        tryReorderAtPointer(activeState);
       }
 
       // 着地直前に周辺カードのディミングを戻し、着地枠への収束を強調する
@@ -468,7 +456,7 @@
         }
       };
 
-      if (prefersReducedMotion() || !activeState.ghostEl) {
+      if (DomUtils.prefersReducedMotion() || !activeState.ghostEl) {
         completeSettle();
         return;
       }

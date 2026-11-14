@@ -301,3 +301,48 @@ test("DomUtils.openConfirmModal opens themed modal, traps confirm, and restores 
   assert.equal(confirmed, true);
   assert.equal(document.querySelector(".bp-modal-dialog"), null);
 });
+
+test("DomUtils.getVisibleCards and DomUtils.stripCardEditState handle card filtering and edit-state cleanup", () => {
+  const { BP, document } = createPortalTestEnv();
+  const { DomUtils, CONSTANTS } = BP;
+
+  assert.deepEqual(Array.from(DomUtils.getVisibleCards(null)), []);
+
+  const row = document.createElement("div");
+  const visibleCard = document.createElement("div");
+  visibleCard.id = "div-1";
+  visibleCard.className = CONSTANTS.CLASSES.SERVICE_CARD;
+
+  const hiddenCard = document.createElement("div");
+  hiddenCard.id = "div-2";
+  hiddenCard.className = `${CONSTANTS.CLASSES.SERVICE_CARD} ${CONSTANTS.CLASSES.HIDDEN_ITEM}`;
+
+  const addCol = document.createElement("div");
+  addCol.className = "bp-add-card-col";
+
+  row.append(visibleCard, hiddenCard, addCol);
+  assert.deepEqual(Array.from(DomUtils.getVisibleCards(row)), [visibleCard]);
+
+  visibleCard.classList.add(
+    CONSTANTS.CLASSES.HIDDEN_ITEM,
+    CONSTANTS.CLASSES.DRAG_PLACEHOLDER,
+    CONSTANTS.CLASSES.DRAG_SETTLING
+  );
+  visibleCard.dataset.bpDraggable = "1";
+  visibleCard.append(
+    DomUtils.createEl("div", CONSTANTS.CLASSES.EDIT_OVERLAY),
+    DomUtils.createEl("div", CONSTANTS.CLASSES.DROP_SLOT)
+  );
+
+  DomUtils.stripCardEditState(visibleCard);
+  assert.equal(visibleCard.querySelector("." + CONSTANTS.CLASSES.EDIT_OVERLAY), null);
+  assert.equal(visibleCard.querySelector("." + CONSTANTS.CLASSES.DROP_SLOT), null);
+  assert.equal(visibleCard.classList.contains(CONSTANTS.CLASSES.HIDDEN_ITEM), false);
+  assert.equal(visibleCard.classList.contains(CONSTANTS.CLASSES.DRAG_PLACEHOLDER), false);
+  assert.equal(visibleCard.classList.contains(CONSTANTS.CLASSES.DRAG_SETTLING), false);
+  assert.equal("bpDraggable" in visibleCard.dataset, false);
+  assert.equal(visibleCard.classList.contains(CONSTANTS.CLASSES.SERVICE_CARD), true);
+
+  DomUtils.stripCardEditState(visibleCard, { stripServiceClass: true });
+  assert.equal(visibleCard.classList.contains(CONSTANTS.CLASSES.SERVICE_CARD), false);
+});

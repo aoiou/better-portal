@@ -41,22 +41,9 @@
     return wrap;
   }
 
-  function stripCardEditState(el, { stripServiceClass = false } = {}) {
-    el
-      .querySelectorAll("." + CONSTANTS.CLASSES.EDIT_OVERLAY + ", ." + CONSTANTS.CLASSES.DROP_SLOT)
-      .forEach((n) => n.remove());
-    el.classList.remove(
-      CONSTANTS.CLASSES.HIDDEN_ITEM,
-      CONSTANTS.CLASSES.DRAG_PLACEHOLDER,
-      CONSTANTS.CLASSES.DRAG_SETTLING
-    );
-    if (stripServiceClass) el.classList.remove(CONSTANTS.CLASSES.SERVICE_CARD);
-    delete el.dataset.bpDraggable;
-  }
-
   function createCardTemplate(sourceCard) {
     const tpl = sourceCard.cloneNode(true);
-    stripCardEditState(tpl, { stripServiceClass: true });
+    DomUtils.stripCardEditState(tpl, { stripServiceClass: true });
     tpl.removeAttribute("style");
     return tpl;
   }
@@ -282,7 +269,6 @@
   BP.CustomCards = {
     findCustomCard,
     createIconElement,
-    stripCardEditState,
     createCardTemplate,
     createCustomCardElement,
     updateCustomCardElement,

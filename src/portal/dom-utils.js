@@ -59,6 +59,39 @@
   }
 
   /**
+   * コンテナ直下にある可視状態のサービスカード要素一覧を返す。
+   */
+  function getVisibleCards(container) {
+    if (!container) return [];
+    const cards = [];
+    for (const el of container.children) {
+      if (
+        el.classList.contains(CONSTANTS.CLASSES.SERVICE_CARD) &&
+        !el.classList.contains(CONSTANTS.CLASSES.HIDDEN_ITEM)
+      ) {
+        cards.push(el);
+      }
+    }
+    return cards;
+  }
+
+  /**
+   * カード要素から編集モード・ドラッグ関連の装飾と状態クラス/属性を除去する。
+   */
+  function stripCardEditState(el, { stripServiceClass = false } = {}) {
+    el
+      .querySelectorAll("." + CONSTANTS.CLASSES.EDIT_OVERLAY + ", ." + CONSTANTS.CLASSES.DROP_SLOT)
+      .forEach((n) => n.remove());
+    el.classList.remove(
+      CONSTANTS.CLASSES.HIDDEN_ITEM,
+      CONSTANTS.CLASSES.DRAG_PLACEHOLDER,
+      CONSTANTS.CLASSES.DRAG_SETTLING
+    );
+    if (stripServiceClass) el.classList.remove(CONSTANTS.CLASSES.SERVICE_CARD);
+    delete el.dataset.bpDraggable;
+  }
+
+  /**
    * FLIP アニメーション付きで DOM 変更を実行する共通ヘルパー。
    * 連続操作による途中状態も現在矩形から滑らかに補間し、終了後にインラインスタイルを解放する。
    */
@@ -145,10 +178,6 @@
       );
       setTimeout(clearIfCurrent, durationMs + 60);
     }
-  }
-
-  function isModalOpen() {
-    return Boolean(activeModal);
   }
 
   function closeModal({ restoreFocus = true } = {}) {
@@ -307,8 +336,9 @@
     createStrokeIconSvg,
     getCheckedRadioValue,
     prefersReducedMotion,
+    getVisibleCards,
+    stripCardEditState,
     flipAnimateElements,
-    isModalOpen,
     closeModal,
     createModalFrame,
     openConfirmModal,

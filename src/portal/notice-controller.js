@@ -220,7 +220,7 @@
       unackBtn.addEventListener("click", (e) => {
         const keyboardActivated = e.detail === 0;
         settings.readNoticeBlocks = [];
-        Storage.saveSettings(settings, { noticeCollapsed: false });
+        Storage.saveSettings(settings);
         syncNoticeSection(settings);
         if (keyboardActivated) {
           collapseBody.querySelector(".bp-notice-ack-btn")?.focus({ preventScroll: true });
@@ -239,7 +239,7 @@
       ackBtn.addEventListener("click", (e) => {
         const keyboardActivated = e.detail === 0;
         settings.readNoticeBlocks = [...currentHashes];
-        Storage.saveSettings(settings, { noticeCollapsed: true });
+        Storage.saveSettings(settings);
         syncNoticeSection(settings, { forceCollapse: true });
         if (keyboardActivated) {
           toggleLink?.focus({ preventScroll: true });

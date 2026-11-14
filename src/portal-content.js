@@ -30,20 +30,6 @@
   const customCardById = new Map();
   const cardById = new Map();
 
-  function getVisibleCardElements() {
-    if (!mainRow) return [];
-    const visible = [];
-    for (const el of mainRow.children) {
-      if (
-        el.classList.contains(CONSTANTS.CLASSES.SERVICE_CARD) &&
-        !el.classList.contains(CONSTANTS.CLASSES.HIDDEN_ITEM)
-      ) {
-        visible.push(el);
-      }
-    }
-    return visible;
-  }
-
   function insertCardInOrder(container, el, orderedIds, trailingEl = null) {
     const targetIdx = orderedIds.indexOf(el.id);
     if (targetIdx >= 0) {
@@ -113,7 +99,7 @@
     const newOrder = OrderLogic.calcMoveOrder(settings.order, settings.hiddenIds, el.id, direction);
     if (!newOrder || !mainRow) return;
 
-    const visibleCards = getVisibleCardElements();
+    const visibleCards = DomUtils.getVisibleCards(mainRow);
     const fromIdx = visibleCards.indexOf(el);
     const swapEl = visibleCards[fromIdx + direction];
     if (fromIdx < 0 || !swapEl) return;
@@ -137,7 +123,7 @@
     if (settings.hiddenIds.includes(id) || !mainRow) return;
 
     const hadFocus = el.contains(document.activeElement);
-    const visibleBefore = getVisibleCardElements();
+    const visibleBefore = DomUtils.getVisibleCards(mainRow);
     const idx = visibleBefore.indexOf(el);
     const nextFocusCard = visibleBefore[idx + 1] || visibleBefore[idx - 1] || null;
 
@@ -184,7 +170,7 @@
     el.dataset.bpDraggable = "1";
     refreshCardOverlay(el, settings, settingsBtn);
 
-    const visibleBefore = getVisibleCardElements();
+    const visibleBefore = DomUtils.getVisibleCards(mainRow);
     DomUtils.flipAnimateElements(
       mainRow,
       visibleBefore,
@@ -219,7 +205,7 @@
           preventScroll: true,
         });
       } else if (mainRow) {
-        const visibleCards = getVisibleCardElements();
+        const visibleCards = DomUtils.getVisibleCards(mainRow);
         DomUtils.flipAnimateElements(
           mainRow,
           visibleCards,
@@ -358,7 +344,7 @@
 
       cardById.clear();
       for (const el of allCards) {
-        CustomCards.stripCardEditState(el);
+        DomUtils.stripCardEditState(el);
         cardById.set(el.id, el);
       }
 
@@ -530,7 +516,7 @@
     }, 2000);
 
     try {
-      mainRow = Toggles.findServiceRow();
+      mainRow = document.querySelector(CONSTANTS.SELECTOR.SERVICE_ROW);
       const hasToggleTarget = TOGGLE_CONFIG.some((cfg) => cfg.find());
       if (!mainRow && !hasToggleTarget) {
         return;
