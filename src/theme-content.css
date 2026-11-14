@@ -664,6 +664,54 @@ html[data-bp-theme="dark"] .bp-modal-radio input {
   accent-color: #38bdf8;
 }
 
+html[data-bp-theme="dark"] .bp-modal-option {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+html[data-bp-theme="dark"] .bp-modal-option:hover {
+  border-color: #475569;
+  background: rgba(56, 189, 248, 0.06);
+}
+
+html[data-bp-theme="dark"] .bp-modal-option:has(input:checked) {
+  border-color: #38bdf8;
+  background: rgba(56, 189, 248, 0.12);
+  box-shadow: 0 0 0 1px #38bdf8;
+}
+
+html[data-bp-theme="dark"] .bp-modal-option:has(input:focus-visible) {
+  outline-color: #38bdf8;
+}
+
+html[data-bp-theme="dark"] .bp-modal-option input[type="radio"] {
+  accent-color: #38bdf8;
+}
+
+html[data-bp-theme="dark"] .bp-modal-option-title {
+  color: #f1f5f9;
+}
+
+html[data-bp-theme="dark"] .bp-modal-option-badge {
+  background: rgba(56, 189, 248, 0.16);
+  color: #7dd3fc;
+}
+
+html[data-bp-theme="dark"] .bp-modal-option-desc {
+  color: #94a3b8;
+}
+
+html[data-bp-theme="dark"] .bp-modal-select {
+  background: #1e293b;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+html[data-bp-theme="dark"] .bp-modal-select:focus {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.25);
+}
+
 html[data-bp-theme="dark"] .bp-preview-card {
   background: #162032;
   border-color: #334155;

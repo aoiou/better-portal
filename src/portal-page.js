@@ -7,6 +7,12 @@
     if (typeof onclick !== "string") return;
     delete link.dataset.bpOnclick;
 
+    if (!onclick) {
+      link.removeAttribute("onclick");
+      link.onclick = null;
+      return;
+    }
+
     link.setAttribute("onclick", onclick);
 
     const match = onclick.match(/doPortal\(\s*(['"])((?:\\\1|(?!\1).)*)\1\s*\)/);
