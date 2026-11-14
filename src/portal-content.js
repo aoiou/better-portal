@@ -19,6 +19,15 @@
       DROP_AFTER: "bp-drop-after",
       EDIT_OVERLAY: "bp-edit-overlay",
       TOGGLE_OVERLAY: "bp-toggle-overlay",
+      NOTICE_BADGE: "bp-notice-badge",
+      NOTICE_FOOTER: "bp-notice-footer",
+      NOTICE_READ: "bp-notice-read",
+      NOTICE_UNREAD: "bp-notice-unread",
+      NOTICE_BLOCK_READ: "bp-notice-block--read",
+      NOTICE_BLOCK_FOLDED: "bp-notice-block--folded",
+      NOTICE_FOLD_BAR: "bp-notice-fold-bar",
+      NOTICE_FOLD_BAR_FLUSH_BOTTOM: "bp-notice-fold-bar--flush-bottom",
+      NOTICE_BODY_FLUSH_BOTTOM: "bp-notice-body--flush-bottom",
     },
     EVENTS: {
       ONCLICK_CHANGE: "bp-onclick-change",
@@ -26,6 +35,10 @@
     SELECTOR: {
       SERVICE_ROW: '.row:has([id^="div-"][class*="col-"] .service-thumb-wrap)',
       SERVICE_CARDS: '[id^="div-"][class*="col-"]:has(.service-thumb-wrap)',
+      NOTICE_CARD: "#PortalComment02",
+      NOTICE_TOGGLE: '.card-header a[data-bs-toggle="collapse"], .card-header a',
+      NOTICE_BODY: "#collapse1, .card-body.collapse",
+      NOTICE_CONTENT: ".ql-editor",
     },
   };
 
@@ -98,6 +111,7 @@
       hideSearchBar: false,
       hideSubNav: false,
       noticeToBottom: false,
+      readNoticeBlocks: [],
       m365RedirectUrl: "",
       // オリジナルカード: { id, title, url, iconType: "default" | "emoji" | "url", iconValue }
       customCards: [],
@@ -119,6 +133,9 @@
       hideSearchBar: Boolean(raw.hideSearchBar),
       hideSubNav: Boolean(raw.hideSubNav),
       noticeToBottom: Boolean(raw.noticeToBottom),
+      readNoticeBlocks: Array.isArray(raw.readNoticeBlocks)
+        ? [...new Set(raw.readNoticeBlocks.filter((h) => typeof h === "string" && h.length > 0))]
+        : defaults.readNoticeBlocks,
       m365RedirectUrl: typeof raw.m365RedirectUrl === "string" ? raw.m365RedirectUrl.trim() : defaults.m365RedirectUrl,
       customCards: Array.isArray(raw.customCards)
         ? raw.customCards.filter((c) => c && typeof c === "object" && typeof c.id === "string" && typeof c.title === "string")
@@ -180,6 +197,257 @@
       if (!insertBefore) targetIdx++;
       newOrder.splice(targetIdx, 0, draggedId);
       return newOrder;
+    },
+  };
+
+  /* =====================================================================
+   * お知らせ更新検知・既読判定ロジック (NoticeLogic - 純粋関数 / SRP)
+   * ===================================================================== */
+  const NoticeLogic = {
+    MAX_BLOCKS_FOR_DIFF: 200,
+    BLOCK_SELECTOR: "p, li, h1, h2, h3, h4, h5, h6, blockquote, pre, tr",
+    LAYOUT_WRAPPER_TAGS: new Set(["DIV", "SECTION", "ARTICLE", "MAIN", "HEADER", "FOOTER", "ASIDE"]),
+    EXTENSION_WIDGET_CLASSES: new Set([
+      CONSTANTS.CLASSES.NOTICE_BADGE,
+      CONSTANTS.CLASSES.NOTICE_FOOTER,
+      CONSTANTS.CLASSES.TOGGLE_OVERLAY,
+      CONSTANTS.CLASSES.EDIT_OVERLAY,
+      CONSTANTS.CLASSES.NOTICE_FOLD_BAR,
+      "bp-notice-fold-icon",
+      "bp-notice-fold-label",
+      "bp-notice-footer-note",
+      "bp-notice-footer-status",
+      "bp-notice-ack-btn",
+      "bp-notice-unack-btn",
+    ]),
+
+    normalizeText(text) {
+      return String(text || "").replace(/[\s\u00A0\u3000]+/g, " ").trim();
+    },
+
+    hashText(str) {
+      let h1 = 0x811c9dc5;
+      let h2 = 0x9e3779b1;
+      for (let i = 0; i < str.length; i++) {
+        const ch = str.charCodeAt(i);
+        h1 ^= ch;
+        h1 = Math.imul(h1, 0x01000193);
+        h2 ^= ch + (i & 0xff);
+        h2 = Math.imul(h2, 0x85ebca6b);
+      }
+      return (h1 >>> 0).toString(36) + "-" + (h2 >>> 0).toString(36);
+    },
+
+    isExtensionNode(node) {
+      return Boolean(
+        node &&
+          node.nodeType === 1 &&
+          [...node.classList].some((c) => this.EXTENSION_WIDGET_CLASSES.has(c))
+      );
+    },
+
+    extractRawText(node) {
+      if (!node || this.isExtensionNode(node)) return "";
+      if (node.nodeType === 3) return node.nodeValue || "";
+      if (node.nodeType !== 1) return "";
+      if (node.tagName === "BR") return " ";
+      let out = "";
+      for (const child of node.childNodes) {
+        out += this.extractRawText(child);
+      }
+      return out;
+    },
+
+    serializeBlock(el) {
+      if (!el || this.isExtensionNode(el)) return "";
+      if (el.nodeType === 3) return this.normalizeText(el.nodeValue);
+      if (el.nodeType !== 1) return "";
+
+      const text = this.normalizeText(this.extractRawText(el));
+      const linkEls = el.matches("a[href]") ? [el] : [...el.querySelectorAll("a[href]")];
+      const links = linkEls
+        .filter((a) => !this.isExtensionNode(a))
+        .map((a) => (a.getAttribute("href") || "").trim())
+        .filter(Boolean);
+      const imgEls = el.matches("img[src]") ? [el] : [...el.querySelectorAll("img[src]")];
+      const imgs = imgEls
+        .filter((img) => !this.isExtensionNode(img))
+        .map((img) => `${(img.getAttribute("src") || "").trim()}|${(img.getAttribute("alt") || "").trim()}`)
+        .filter((s) => s !== "|");
+
+      if (!text && links.length === 0 && imgs.length === 0) return "";
+      return [text, links.join("\t"), imgs.join("\t")].filter(Boolean).join("\n");
+    },
+
+    collectBlockEntries(root) {
+      if (!root) return [];
+      const entries = [];
+
+      const walk = (container) => {
+        for (const node of container.childNodes) {
+          if (this.isExtensionNode(node)) continue;
+          if (node.nodeType === 3) {
+            const text = this.normalizeText(node.nodeValue);
+            if (text) {
+              entries.push({ element: null, fingerprint: text, hash: this.hashText(text) });
+            }
+          } else if (node.nodeType === 1) {
+            const hasNestedBlock = Boolean(node.querySelector(this.BLOCK_SELECTOR));
+            if (hasNestedBlock) {
+              walk(node);
+            } else {
+              const fp = this.serializeBlock(node);
+              if (fp) {
+                entries.push({ element: node, fingerprint: fp, hash: this.hashText(fp) });
+              }
+            }
+          }
+        }
+      };
+
+      walk(root);
+      return entries;
+    },
+
+    extractBlockData(root) {
+      const entries = this.collectBlockEntries(root);
+      if (entries.length === 0) {
+        return { hashes: [], entries: [], collapsedToSingleHash: false };
+      }
+      if (entries.length > this.MAX_BLOCKS_FOR_DIFF) {
+        return {
+          hashes: [this.hashText(entries.map((e) => e.fingerprint).join("\n"))],
+          entries,
+          collapsedToSingleHash: true,
+        };
+      }
+      return {
+        hashes: [...new Set(entries.map((e) => e.hash))],
+        entries,
+        collapsedToSingleHash: false,
+      };
+    },
+
+    evaluateNoticeState(currentHashes, readHashes) {
+      const current = Array.isArray(currentHashes) ? currentHashes : [];
+      const read = Array.isArray(readHashes) ? readHashes : [];
+      if (current.length === 0) {
+        return {
+          status: "empty",
+          hasUnseen: false,
+          hasMixedReadAndUnseen: false,
+          shouldPrune: read.length > 0,
+          prunedReadHashes: [],
+        };
+      }
+      if (read.length === 0) {
+        return {
+          status: "unread",
+          hasUnseen: true,
+          hasMixedReadAndUnseen: false,
+          shouldPrune: false,
+          prunedReadHashes: read,
+        };
+      }
+      const readSet = new Set(read);
+      if (current.some((h) => !readSet.has(h))) {
+        return {
+          status: "unread",
+          hasUnseen: true,
+          hasMixedReadAndUnseen: current.some((h) => readSet.has(h)),
+          shouldPrune: false,
+          prunedReadHashes: read,
+        };
+      }
+      const currentSet = new Set(current);
+      const uniqueRead = [...new Set(read)];
+      const pruned = uniqueRead.filter((h) => currentSet.has(h));
+      return {
+        status: "read",
+        hasUnseen: false,
+        hasMixedReadAndUnseen: false,
+        shouldPrune: pruned.length !== read.length,
+        prunedReadHashes: pruned,
+      };
+    },
+
+    collectFoldGroups(root, entries, readSet) {
+      if (!root || !Array.isArray(entries) || entries.length === 0) return [];
+      const groups = [];
+
+      const classifyUnit = (el) => {
+        const matched = entries.filter((e) => e.element && (e.element === el || el.contains(e.element)));
+        if (matched.length === 0) {
+          return { kind: "spacer", readCount: 0, hashes: [] };
+        }
+        if (matched.every((e) => readSet.has(e.hash))) {
+          return {
+            kind: "read",
+            readCount: matched.length,
+            hashes: matched.map((e) => e.hash),
+          };
+        }
+        return { kind: "unseen", readCount: 0, hashes: [] };
+      };
+
+      const walkContainer = (container) => {
+        let currentUnits = [];
+        let trailingSpacers = [];
+        let currentReadCount = 0;
+        let currentHashes = [];
+
+        const flush = () => {
+          if (currentUnits.length > 0 && currentReadCount > 0) {
+            groups.push({
+              elements: currentUnits,
+              anchor: currentUnits[0],
+              readCount: currentReadCount,
+              key: `${groups.length}:${currentHashes.join("|")}`,
+            });
+          }
+          currentUnits = [];
+          trailingSpacers = [];
+          currentReadCount = 0;
+          currentHashes = [];
+        };
+
+        for (const node of container.childNodes) {
+          if (this.isExtensionNode(node)) continue;
+          if (node.nodeType === 3) {
+            if (this.normalizeText(node.nodeValue)) flush();
+            continue;
+          }
+          if (node.nodeType !== 1) continue;
+
+          if (this.LAYOUT_WRAPPER_TAGS.has(node.tagName) && node.querySelector(this.BLOCK_SELECTOR)) {
+            flush();
+            walkContainer(node);
+            continue;
+          }
+
+          const info = classifyUnit(node);
+          if (info.kind === "read") {
+            if (currentUnits.length > 0 && trailingSpacers.length > 0) {
+              currentUnits.push(...trailingSpacers);
+            }
+            trailingSpacers = [];
+            currentUnits.push(node);
+            currentReadCount += info.readCount;
+            currentHashes.push(...info.hashes);
+          } else if (info.kind === "spacer") {
+            if (currentUnits.length > 0) {
+              trailingSpacers.push(node);
+            }
+          } else {
+            flush();
+          }
+        }
+
+        flush();
+      };
+
+      walkContainer(root);
+      return groups;
     },
   };
 
@@ -958,6 +1226,286 @@
   }
 
   /* =====================================================================
+   * お知らせ更新検知・既読折りたたみコントローラ (NoticeController)
+   * ===================================================================== */
+  function getNoticeParts() {
+    const noticeEl = document.querySelector(CONSTANTS.SELECTOR.NOTICE_CARD);
+    if (!noticeEl) return null;
+    const toggleLink = noticeEl.querySelector(CONSTANTS.SELECTOR.NOTICE_TOGGLE);
+    const collapseBody = noticeEl.querySelector(CONSTANTS.SELECTOR.NOTICE_BODY);
+    const contentEl = noticeEl.querySelector(CONSTANTS.SELECTOR.NOTICE_CONTENT) || collapseBody;
+    return { noticeEl, toggleLink, collapseBody, contentEl };
+  }
+
+  function setNoticeCollapsed(parts, collapsed, { preferBootstrapClick = false } = {}) {
+    const { toggleLink, collapseBody } = parts;
+    if (!collapseBody) return;
+
+    if (preferBootstrapClick && toggleLink && collapseBody.classList.contains("show")) {
+      if (!collapseBody.classList.contains("collapsing")) {
+        toggleLink.click();
+      }
+      return;
+    }
+
+    collapseBody.classList.remove("collapsing");
+    collapseBody.classList.toggle("show", !collapsed);
+    collapseBody.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    if (toggleLink) {
+      toggleLink.classList.toggle("collapsed", collapsed);
+      toggleLink.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    }
+  }
+
+  function bindNoticeToggleFallback(parts) {
+    const { toggleLink, collapseBody } = parts;
+    if (!toggleLink || !collapseBody || toggleLink.dataset.bpToggleBound) return;
+    toggleLink.dataset.bpToggleBound = "1";
+
+    let preClickShown = null;
+    toggleLink.addEventListener(
+      "click",
+      () => {
+        preClickShown = collapseBody.classList.contains("show");
+      },
+      true
+    );
+
+    // Bootstrap (document バブリング) より後に window バブリングで未処理時のみフォールバックする
+    window.addEventListener("click", (e) => {
+      const target = e.target instanceof Element ? e.target : e.target?.parentElement;
+      if (!target || !toggleLink.contains(target)) return;
+      if (preClickShown === null) return;
+
+      const wasShown = preClickShown;
+      preClickShown = null;
+      if (!collapseBody.classList.contains("collapsing") &&
+          collapseBody.classList.contains("show") === wasShown) {
+        e.preventDefault();
+        setNoticeCollapsed(parts, wasShown);
+      }
+    });
+  }
+
+  function renderNoticeBadge(toggleLink, status) {
+    if (!toggleLink) return;
+    let badge = toggleLink.querySelector("." + CONSTANTS.CLASSES.NOTICE_BADGE);
+
+    const badgeMeta = {
+      unread: { text: "未読", mod: "bp-notice-badge--unread" },
+      read: { text: "確認済み", mod: "bp-notice-badge--read" },
+    }[status];
+
+    if (!badgeMeta) {
+      badge?.remove();
+      return;
+    }
+
+    if (!badge) {
+      badge = document.createElement("span");
+      const titleSpan = toggleLink.querySelector("span");
+      if (titleSpan) titleSpan.after(badge);
+      else toggleLink.appendChild(badge);
+    }
+
+    badge.className = `${CONSTANTS.CLASSES.NOTICE_BADGE} ${badgeMeta.mod}`;
+    badge.textContent = badgeMeta.text;
+  }
+
+  function hasVisibleContentAfter(container, el) {
+    const foldedClass = CONSTANTS.CLASSES.NOTICE_BLOCK_FOLDED;
+    let cur = el;
+    while (cur && cur !== container) {
+      const parent = cur.parentNode;
+      if (!parent) break;
+      const siblings = parent.childNodes;
+      const idx = Array.prototype.indexOf.call(siblings, cur);
+      for (let i = idx + 1; i < siblings.length; i++) {
+        const sib = siblings[i];
+        if (sib.nodeType === 3) {
+          if (NoticeLogic.normalizeText(sib.nodeValue)) return true;
+        } else if (sib.nodeType === 1 && !NoticeLogic.isExtensionNode(sib)) {
+          if (!sib.classList.contains(foldedClass)) {
+            if (NoticeLogic.normalizeText(sib.textContent)) return true;
+            if (sib.matches("img, hr, table, iframe, svg") || sib.querySelector("img, hr, table, iframe, svg")) {
+              return true;
+            }
+          }
+        }
+      }
+      cur = parent;
+    }
+    return false;
+  }
+
+  function applyFoldGroupState(bar, group, expanded, contentEl = null) {
+    bar.dataset.bpFoldExpanded = expanded ? "1" : "0";
+    bar.dataset.bpFoldKey = group.key;
+    bar.setAttribute("aria-expanded", expanded ? "true" : "false");
+    bar.classList.toggle("is-expanded", expanded);
+
+    const label = bar.querySelector(".bp-notice-fold-label");
+    if (label) {
+      label.textContent = expanded ? "確認済みの内容を折りたたむ" : "確認済みの内容を表示";
+    }
+
+    const foldedClass = CONSTANTS.CLASSES.NOTICE_BLOCK_FOLDED;
+    for (const el of group.elements) {
+      el.classList.toggle(foldedClass, !expanded);
+    }
+
+    const isFlushBottom = bar.dataset.bpFoldAtBottom === "1" && !expanded;
+    bar.classList.toggle(CONSTANTS.CLASSES.NOTICE_FOLD_BAR_FLUSH_BOTTOM, isFlushBottom);
+    if (contentEl && bar.dataset.bpFoldAtBottom === "1") {
+      contentEl.classList.toggle(CONSTANTS.CLASSES.NOTICE_BODY_FLUSH_BOTTOM, isFlushBottom);
+    }
+  }
+
+  function createFoldBar(group, expanded, isBottomGroup, contentEl) {
+    const bar = document.createElement("button");
+    bar.type = "button";
+    bar.className = CONSTANTS.CLASSES.NOTICE_FOLD_BAR;
+    bar.dataset.bpFoldAtBottom = isBottomGroup ? "1" : "0";
+
+    const icon = document.createElement("span");
+    icon.className = "bp-notice-fold-icon";
+    icon.setAttribute("aria-hidden", "true");
+    icon.textContent = "▸";
+
+    const label = document.createElement("span");
+    label.className = "bp-notice-fold-label";
+
+    bar.append(icon, label);
+    applyFoldGroupState(bar, group, expanded, contentEl);
+    bar.addEventListener("click", () => {
+      const nextExpanded = bar.dataset.bpFoldExpanded !== "1";
+      applyFoldGroupState(bar, group, nextExpanded, contentEl);
+    });
+
+    return bar;
+  }
+
+  function renderNoticeBlockStates(contentEl, blockData, state, readHashes) {
+    if (!contentEl) return;
+    const readClass = CONSTANTS.CLASSES.NOTICE_BLOCK_READ;
+    const foldedClass = CONSTANTS.CLASSES.NOTICE_BLOCK_FOLDED;
+    const foldBarClass = CONSTANTS.CLASSES.NOTICE_FOLD_BAR;
+
+    contentEl.classList.remove(CONSTANTS.CLASSES.NOTICE_BODY_FLUSH_BOTTOM);
+
+    const expandedKeys = new Set();
+    for (const oldBar of contentEl.querySelectorAll("." + foldBarClass)) {
+      if (oldBar.dataset.bpFoldExpanded === "1" && oldBar.dataset.bpFoldKey) {
+        expandedKeys.add(oldBar.dataset.bpFoldKey);
+      }
+      oldBar.remove();
+    }
+
+    for (const prev of contentEl.querySelectorAll(`.${readClass}, .${foldedClass}`)) {
+      prev.classList.remove(readClass, foldedClass);
+    }
+    if (!state.hasMixedReadAndUnseen || blockData.collapsedToSingleHash) {
+      return;
+    }
+
+    const readSet = new Set(Array.isArray(readHashes) ? readHashes : []);
+    for (const entry of blockData.entries) {
+      if (entry.element && readSet.has(entry.hash)) {
+        entry.element.classList.add(readClass);
+      }
+    }
+
+    const foldGroups = NoticeLogic.collectFoldGroups(contentEl, blockData.entries, readSet);
+    for (const group of foldGroups) {
+      const lastEl = group.elements[group.elements.length - 1];
+      const isBottomGroup = Boolean(lastEl && !hasVisibleContentAfter(contentEl, lastEl));
+      const bar = createFoldBar(group, expandedKeys.has(group.key), isBottomGroup, contentEl);
+      group.anchor.before(bar);
+    }
+  }
+
+  function renderNoticeFooter(parts, status, currentHashes, settings) {
+    const { collapseBody } = parts;
+    if (!collapseBody) return;
+
+    const existing = collapseBody.querySelector("." + CONSTANTS.CLASSES.NOTICE_FOOTER);
+    if (status === "empty") {
+      existing?.remove();
+      return;
+    }
+
+    const footer = existing || document.createElement("div");
+    footer.className = CONSTANTS.CLASSES.NOTICE_FOOTER;
+
+    if (status === "read") {
+      const statusText = document.createElement("span");
+      statusText.className = "bp-notice-footer-status";
+      statusText.textContent = "✓ 確認済み（次回アクセス時は自動で折りたたまれます）";
+
+      const unackBtn = document.createElement("button");
+      unackBtn.type = "button";
+      unackBtn.className = "bp-notice-unack-btn";
+      unackBtn.textContent = "未読に戻す";
+      unackBtn.addEventListener("click", () => {
+        settings.readNoticeBlocks = [];
+        saveSettings(settings);
+        syncNoticeSection(settings);
+      });
+
+      footer.replaceChildren(statusText, unackBtn);
+    } else {
+      const note = document.createElement("span");
+      note.className = "bp-notice-footer-note";
+      note.textContent = "確認すると次回から折りたたまれます（新着や変更時は自動で再表示）";
+
+      const ackBtn = document.createElement("button");
+      ackBtn.type = "button";
+      ackBtn.className = "bp-notice-ack-btn";
+      ackBtn.textContent = "✓ 確認済みにする";
+      ackBtn.addEventListener("click", () => {
+        settings.readNoticeBlocks = [...currentHashes];
+        saveSettings(settings);
+        syncNoticeSection(settings, { forceCollapse: true });
+      });
+
+      footer.replaceChildren(note, ackBtn);
+    }
+
+    if (!existing) collapseBody.appendChild(footer);
+  }
+
+  function syncNoticeSection(settings, { forceCollapse = false } = {}) {
+    const parts = getNoticeParts();
+    if (!parts) return;
+
+    bindNoticeToggleFallback(parts);
+
+    const blockData = NoticeLogic.extractBlockData(parts.contentEl);
+    const currentHashes = blockData.hashes;
+    const state = NoticeLogic.evaluateNoticeState(currentHashes, settings.readNoticeBlocks);
+
+    if (state.shouldPrune) {
+      settings.readNoticeBlocks = state.prunedReadHashes;
+      saveSettings(settings);
+    }
+
+    const isFirstInit = !parts.noticeEl.dataset.bpNoticeInitialized;
+    if (isFirstInit) {
+      parts.noticeEl.dataset.bpNoticeInitialized = "1";
+      setNoticeCollapsed(parts, state.status === "read" || state.status === "empty");
+    } else if (forceCollapse) {
+      setNoticeCollapsed(parts, true, { preferBootstrapClick: true });
+    }
+
+    parts.noticeEl.classList.toggle(CONSTANTS.CLASSES.NOTICE_READ, state.status === "read");
+    parts.noticeEl.classList.toggle(CONSTANTS.CLASSES.NOTICE_UNREAD, state.status === "unread");
+
+    renderNoticeBlockStates(parts.contentEl, blockData, state, settings.readNoticeBlocks);
+    renderNoticeBadge(parts.toggleLink, state.status);
+    renderNoticeFooter(parts, state.status, currentHashes, settings);
+  }
+
+  /* =====================================================================
    * レイアウト・編集モード・アプリケーション統合 (PortalApp)
    * ===================================================================== */
   function applyLayout(settings) {
@@ -1015,6 +1563,7 @@
       }
     }
 
+    syncNoticeSection(settings);
     applyExtraHides(settings);
   }
 
@@ -1049,6 +1598,7 @@
           settings.customCards = customCards;
           saveSettings(settings);
           hiddenSectionOpen = false;
+          delete document.querySelector(CONSTANTS.SELECTOR.NOTICE_CARD)?.dataset.bpNoticeInitialized;
           exitEditMode();
           applyLayout(settings);
         }
