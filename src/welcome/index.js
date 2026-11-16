@@ -40,6 +40,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const shortcutOsLabel = document.getElementById('shortcut-os-label');
   const shortcutModKey = document.getElementById('shortcut-mod-key');
   const shortcutKbdGroup = document.getElementById('shortcut-kbd-group');
+  const faqJumpLinks = document.querySelectorAll('[data-open-faq]');
 
   const PLATFORM_SHORTCUTS = {
     mac: { modKey: 'Option', osLabel: 'Mac' },
@@ -137,15 +138,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  function triggerOptionPulse(inputElement) {
-    const item = inputElement?.closest('.option-item');
-    if (!item) return;
-    item.classList.remove('saved-pulse');
-    void item.offsetWidth;
-    item.classList.add('saved-pulse');
-    item.addEventListener('animationend', () => {
-      item.classList.remove('saved-pulse');
+  function triggerPulse(element, className = 'saved-pulse') {
+    if (!element) return;
+    element.classList.remove(className);
+    void element.offsetWidth;
+    element.classList.add(className);
+    element.addEventListener('animationend', () => {
+      element.classList.remove(className);
     }, { once: true });
+  }
+
+  function triggerOptionPulse(inputElement) {
+    triggerPulse(inputElement?.closest('.option-item'), 'saved-pulse');
   }
 
   function showSaveFeedback(duration = FEEDBACK_DURATION) {
@@ -343,6 +347,22 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   autoPasswordTabToggle?.addEventListener('change', () => {
     handleExclusiveToggle(autoPasswordTabToggle, autoFido2Toggle);
+  });
+
+  faqJumpLinks.forEach((link) => {
+    link.addEventListener('click', (e) => {
+      const targetId = link.getAttribute('data-open-faq');
+      const targetFaq = targetId ? document.getElementById(targetId) : null;
+      if (!targetFaq) return;
+
+      e.preventDefault();
+      targetFaq.open = true;
+      targetFaq.setAttribute('open', '');
+      targetFaq.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+      const summary = targetFaq.querySelector?.('summary');
+      summary?.focus?.({ preventScroll: true });
+      triggerPulse(targetFaq, 'faq-highlight');
+    });
   });
 
   themeToggle?.addEventListener('click', (e) => {

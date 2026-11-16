@@ -201,6 +201,19 @@ async function createWelcomeTestEnv({
   const shortcutOsLabel = register("shortcut-os-label", "span");
   const shortcutModKey = register("shortcut-mod-key", "kbd");
   const shortcutKbdGroup = register("shortcut-kbd-group", "span");
+  const faqFido2 = register("faq-fido2", "details");
+  faqFido2.open = false;
+  faqFido2.scrollIntoView = () => {
+    faqFido2._scrolled = true;
+  };
+  const faqFido2Summary = createFakeNode("summary");
+  faqFido2Summary._doc = doc;
+  faqFido2._children.push(faqFido2Summary);
+  faqFido2.querySelector = (sel) => (sel === "summary" ? faqFido2Summary : null);
+
+  const faqJumpLink = createFakeNode("a");
+  faqJumpLink._doc = doc;
+  faqJumpLink.setAttribute("data-open-faq", "faq-fido2");
 
   const makeThemeButtons = (parent) =>
     ["system", "light", "dark"].map((val) => {
@@ -219,6 +232,7 @@ async function createWelcomeTestEnv({
   doc.querySelectorAll = (sel) => {
     if (sel === ".theme-menu-item") return themeMenuItems;
     if (sel === ".theme-choice") return themeChoices;
+    if (sel === "[data-open-faq]") return [faqJumpLink];
     return [];
   };
 
@@ -320,6 +334,9 @@ async function createWelcomeTestEnv({
       shortcutOsLabel,
       shortcutModKey,
       shortcutKbdGroup,
+      faqFido2,
+      faqFido2Summary,
+      faqJumpLink,
     },
     setOsDark(dark) {
       isPrefersDark = dark;
@@ -456,6 +473,14 @@ test("welcome/index.js saves username, handles IME/clear, enforces FIDO2 exclusi
   assert.equal(syncStore.get("theme"), "system");
   assert.equal(elements.themeChoices[0].getAttribute("aria-checked"), "true");
 
+  // 初期設定内の FAQ リンククリックで対象アコーディオンを開いてフォーカス・スクロール
+  elements.faqJumpLink.dispatchEvent({ type: "click" });
+  assert.equal(elements.faqFido2.open, true);
+  assert.equal(elements.faqFido2.hasAttribute("open"), true);
+  assert.equal(elements.faqFido2._scrolled, true);
+  assert.equal(elements.faqFido2.classList.contains("faq-highlight"), true);
+  assert.equal(doc.activeElement, elements.faqFido2Summary);
+
   // 外部（ポップアップ等）からの storage.onChanged 同期
   doc.activeElement = doc.body;
   for (const fn of onChangedListeners) {
@@ -553,6 +578,8 @@ test("welcome/index.html contains required beginner guidance links, single short
   assert.match(html, /パスワードは保存されますか？/);
   assert.match(html, /パスワードは保存されますか？.*より快適にログインしたい場合は.*パスワードレス認証の利用をご検討ください/s);
   assert.equal(html.match(/fido_manual\.pdf/g)?.length, 1);
+  assert.match(html, /options-subgroup.*href="#faq-fido2"[^>]*data-open-faq="faq-fido2"/s);
+  assert.match(html, /<details id="faq-fido2" class="faq-item">/);
   assert.match(html, /「パスワードレス（FIDO2）」とは何ですか？<\/span>/);
   assert.match(html, /https:\/\/doshishaacjp\.sharepoint\.com\/sites\/it\/mfa_manual\/fido_manual\.pdf/);
   assert.match(html, /アンインストール/);
