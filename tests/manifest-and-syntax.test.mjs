@@ -32,6 +32,24 @@ test("manifest.json is valid and all referenced assets exist in src/", () => {
   assert.equal(portalScripts[portalScripts.length - 1], "portal/content.js");
 });
 
+test("welcome page assets exist and comply with MV3 CSP (no inline scripts)", () => {
+  const welcomeDir = path.join(SRC_DIR, "welcome");
+  const htmlPath = path.join(welcomeDir, "index.html");
+  const cssPath = path.join(welcomeDir, "index.css");
+  const jsPath = path.join(welcomeDir, "index.js");
+
+  assert.ok(fs.existsSync(htmlPath), "Missing welcome/index.html");
+  assert.ok(fs.existsSync(cssPath), "Missing welcome/index.css");
+  assert.ok(fs.existsSync(jsPath), "Missing welcome/index.js");
+
+  const html = fs.readFileSync(htmlPath, "utf8");
+  assert.match(html, /<link\s+rel="stylesheet"\s+href="index\.css">/);
+  assert.match(html, /<script\s+src="index\.js"><\/script>/);
+  const inlineScripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)]
+    .filter((m) => !/\bsrc\s*=/.test(m[1]) || m[2].trim().length > 0);
+  assert.equal(inlineScripts.length, 0, "welcome/index.html must not contain inline scripts");
+});
+
 test("all JavaScript files under src/ pass Node syntax check", () => {
   const jsFiles = [];
   const walk = (dir) => {

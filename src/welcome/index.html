@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ようこそ | Better Portal for Doshisha</title>
+  <link rel="icon" type="image/png" href="../icons/icon48.png">
+  <link rel="stylesheet" href="index.css">
+</head>
+<body>
+  <!-- SVG スプライト（重複アイコンの一元定義） -->
+  <svg aria-hidden="true" style="display:none">
+    <defs>
+      <symbol id="icon-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"></polyline>
+      </symbol>
+      <symbol id="icon-system" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+        <line x1="8" y1="21" x2="16" y2="21"></line>
+        <line x1="12" y1="17" x2="12" y2="21"></line>
+      </symbol>
+      <symbol id="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="5"></circle>
+        <line x1="12" y1="1" x2="12" y2="3"></line>
+        <line x1="12" y1="21" x2="12" y2="23"></line>
+        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+        <line x1="1" y1="12" x2="3" y2="12"></line>
+        <line x1="21" y1="12" x2="23" y2="12"></line>
+        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+      </symbol>
+      <symbol id="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+      </symbol>
+      <symbol id="icon-external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+        <polyline points="15 3 21 3 21 9"></polyline>
+        <line x1="10" y1="14" x2="21" y2="3"></line>
+      </symbol>
+      <symbol id="icon-chevron-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="6 9 12 15 18 9"></polyline>
+      </symbol>
+    </defs>
+  </svg>
+
+  <div class="page-shell">
+    <!-- Top Header -->
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo-icon" aria-hidden="true">D</div>
+        <div class="brand-text">
+          <span class="brand-name">Better Portal for Doshisha</span>
+          <span id="version-text" class="version-badge" aria-label="拡張機能バージョン"></span>
+        </div>
+      </div>
+
+      <div class="theme-menu-wrapper">
+        <button type="button" id="theme-toggle" class="theme-toggle" title="外観テーマ設定" aria-label="外観テーマ設定" aria-haspopup="true" aria-expanded="false">
+          <svg class="theme-icon system-icon" aria-hidden="true"><use href="#icon-system"></use></svg>
+          <svg class="theme-icon sun-icon" aria-hidden="true"><use href="#icon-sun"></use></svg>
+          <svg class="theme-icon moon-icon" aria-hidden="true"><use href="#icon-moon"></use></svg>
+          <span class="theme-toggle-label">テーマ</span>
+        </button>
+        <div id="theme-menu" class="theme-menu" role="menu" aria-label="外観テーマの選択" hidden>
+          <button type="button" class="theme-menu-item" data-theme-value="system" role="menuitemradio" aria-checked="false">
+            <svg class="menu-icon" aria-hidden="true"><use href="#icon-system"></use></svg>
+            <div class="menu-item-text">
+              <span class="menu-item-title">システム設定</span>
+              <span class="menu-item-desc">OS設定に連動</span>
+            </div>
+            <svg class="check-icon" aria-hidden="true"><use href="#icon-check"></use></svg>
+          </button>
+          <button type="button" class="theme-menu-item" data-theme-value="light" role="menuitemradio" aria-checked="false">
+            <svg class="menu-icon" aria-hidden="true"><use href="#icon-sun"></use></svg>
+            <div class="menu-item-text">
+              <span class="menu-item-title">ライト</span>
+            </div>
+            <svg class="check-icon" aria-hidden="true"><use href="#icon-check"></use></svg>
+          </button>
+          <button type="button" class="theme-menu-item" data-theme-value="dark" role="menuitemradio" aria-checked="false">
+            <svg class="menu-icon" aria-hidden="true"><use href="#icon-moon"></use></svg>
+            <div class="menu-item-text">
+              <span class="menu-item-title">ダーク</span>
+            </div>
+            <svg class="check-icon" aria-hidden="true"><use href="#icon-check"></use></svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="main-stack">
+      <!-- Hero -->
+      <section class="hero" aria-labelledby="hero-title">
+        <span class="status-pill">インストール完了</span>
+        <h1 id="hero-title" class="hero-title">同志社ポータルを、もっと快適に。</h1>
+        <p class="hero-lead">
+          ログイン時のユーザー名自動入力や、ポータル画面の並び替え・ダークモードが使えるようになりました。まずは下の初期設定（約30秒）を済ませてみましょう。
+        </p>
+        <div class="privacy-banner" role="note">
+          <svg class="privacy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+          </svg>
+          <p>
+            入力したユーザー名や設定はお使いのブラウザ内にのみ保存され、<strong>外部サーバーへ送信されることはありません</strong>（パスワードも保存しません）。※本拡張機能は個人開発の非公式ツールです。
+          </p>
+        </div>
+      </section>
+
+      <!-- Section 1: 初期設定フォーム + ショートカットお試し -->
+      <section class="card setup-card" aria-labelledby="setup-heading">
+        <div class="section-header">
+          <span class="step-badge">初期設定</span>
+          <h2 id="setup-heading" class="section-title">ログイン自動入力を設定する</h2>
+          <p class="section-desc">
+            ここで変更した内容はすべて自動で保存され、ツールバーの拡張機能アイコンから開く設定画面とも連動します。
+          </p>
+        </div>
+
+        <div class="setup-body">
+          <div class="form-group">
+            <label for="username-input" class="form-label">
+              自動入力するユーザー名
+              <span class="required-dot" aria-hidden="true">•</span>
+            </label>
+            <div class="input-wrapper">
+              <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+              </svg>
+              <input
+                type="text"
+                id="username-input"
+                class="form-input"
+                placeholder="大学ポータルで使うユーザー名を入力"
+                autocomplete="off"
+                spellcheck="false"
+              >
+              <div class="input-actions">
+                <span id="save-indicator" class="save-indicator" title="自動保存完了" aria-label="自動保存完了">
+                  <svg aria-hidden="true"><use href="#icon-check"></use></svg>
+                </span>
+                <button type="button" id="clear-btn" class="clear-btn" title="入力をクリア" aria-label="入力をクリア">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <p class="form-hint">
+              ログイン画面を開いた際に「ユーザー名」欄へ自動入力されます（入力を止めて1秒後、またはEnterで自動保存）。
+            </p>
+          </div>
+
+          <!-- Options Group -->
+          <div class="options-group">
+            <div class="option-item">
+              <label class="toggle-label" for="auto-submit-toggle">
+                <div class="toggle-text">
+                  <span class="option-title">自動で「次へ」に進む</span>
+                  <span class="option-desc">ユーザー名の入力後に「次へ」ボタンを自動クリックして次の画面へ進みます</span>
+                </div>
+                <div class="toggle-switch">
+                  <input type="checkbox" id="auto-submit-toggle">
+                  <span class="toggle-slider"></span>
+                </div>
+              </label>
+            </div>
+
+            <!-- パスワードレス（FIDO2）設定者向けグループ -->
+            <div class="options-subgroup">
+              <div class="subgroup-header">
+                <div class="subgroup-title-row">
+                  <svg class="subgroup-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                  </svg>
+                  <span class="subgroup-title">パスワードレス（FIDO2）設定者向け</span>
+                </div>
+                <p class="subgroup-hint">※ 大学アカウントに指紋・顔認証（Windows Hello 等）を登録している場合の設定です。分からない場合は両方 OFF のままで問題ありません。</p>
+              </div>
+
+              <div class="subgroup-items">
+                <div class="option-item">
+                  <label class="toggle-label" for="auto-fido2-toggle">
+                    <div class="toggle-text">
+                      <span class="option-title">パスワードレス認証を自動開始</span>
+                      <span class="option-desc">画面表示時に「パスワードレス認証」を自動クリック</span>
+                    </div>
+                    <div class="toggle-switch">
+                      <input type="checkbox" id="auto-fido2-toggle">
+                      <span class="toggle-slider"></span>
+                    </div>
+                  </label>
+                </div>
+
+                <div class="option-item">
+                  <label class="toggle-label" for="auto-password-tab-toggle">
+                    <div class="toggle-text">
+                      <span class="option-title">「パスワード」タブを自動選択</span>
+                      <span class="option-desc">FIDO2画面よりパスワード入力を優先して表示</span>
+                    </div>
+                    <div class="toggle-switch">
+                      <input type="checkbox" id="auto-password-tab-toggle">
+                      <span class="toggle-slider"></span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Try Shortcut CTA -->
+          <div class="shortcut-callout" aria-labelledby="try-shortcut-title">
+            <div class="shortcut-callout-header">
+              <span class="try-badge">今すぐ試してみよう</span>
+              <h3 id="try-shortcut-title" class="shortcut-title">ショートカットキーでいつでもログイン画面を開く</h3>
+            </div>
+            <div class="shortcut-keys-row">
+              <div class="shortcut-combo">
+                <span class="os-label">Windows / Linux</span>
+                <span class="kbd-group"><kbd>Alt</kbd><span class="plus">+</span><kbd>Shift</kbd><span class="plus">+</span><kbd>D</kbd></span>
+              </div>
+              <div class="shortcut-combo">
+                <span class="os-label">Mac</span>
+                <span class="kbd-group"><kbd>Option</kbd><span class="plus">+</span><kbd>Shift</kbd><span class="plus">+</span><kbd>D</kbd></span>
+              </div>
+            </div>
+            <p class="shortcut-desc">
+              別のサイトを見ているときでも、このキーを押すだけで同志社ログイン画面が開き、上の設定ですぐに自動入力されます。今すぐキーを押して動作を試してみてください！
+            </p>
+            <div class="shortcut-fallback-links">
+              <a href="https://doshisha.ex-tic.com/auth/session" id="open-login-link" class="link-pill" target="_blank" rel="noopener noreferrer">
+                <span>クリックしてログイン画面を開く</span>
+                <svg class="external-icon" aria-hidden="true"><use href="#icon-external"></use></svg>
+              </a>
+              <a href="https://doshisha.ex-tic.com/idm/user/portal/" id="open-portal-link" class="link-pill link-pill-secondary" target="_blank" rel="noopener noreferrer">
+                <span>ポータル画面を開く</span>
+                <svg class="external-icon" aria-hidden="true"><use href="#icon-external"></use></svg>
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 2: 基本の使い方 -->
+      <section class="card" aria-labelledby="tips-heading">
+        <div class="section-header">
+          <span class="step-badge">基本の使い方</span>
+          <h2 id="tips-heading" class="section-title">覚えておくと便利な2つのポイント</h2>
+        </div>
+
+        <div class="tips-grid">
+          <article class="tip-card">
+            <div class="tip-number" aria-hidden="true">1</div>
+            <h3 class="tip-title">アイコンをツールバーに固定すると便利</h3>
+            <p class="tip-body">
+              ブラウザ右上のパズルマーク（🧩）から「Better Portal for Doshisha」をピン留めすると、紫色の「<strong>D</strong>」アイコンからいつでもユーザー名やテーマ設定を変更できます。
+            </p>
+          </article>
+
+          <article class="tip-card">
+            <div class="tip-number" aria-hidden="true">2</div>
+            <h3 class="tip-title">ポータル右下の「⚙」で画面を整理</h3>
+            <p class="tip-body">
+              ポータル画面（<code>doshisha.ex-tic.com/idm/user/portal/</code>）の右下に紫色の歯車ボタン「<strong>⚙</strong>」が表示されます。カードの並び替え・不要なカードの非表示・独自カードの追加・お知らせの既読折りたたみが使えます。
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <!-- Section 3: よくある質問 (FAQ) -->
+      <section class="card" aria-labelledby="faq-heading">
+        <div class="section-header">
+          <span class="step-badge">Q &amp; A</span>
+          <h2 id="faq-heading" class="section-title">よくある質問</h2>
+        </div>
+
+        <div class="faq-list">
+          <details class="faq-item">
+            <summary class="faq-question">
+              <span>パスワードも保存されますか？</span>
+              <svg class="faq-chevron" aria-hidden="true"><use href="#icon-chevron-down"></use></svg>
+            </summary>
+            <div class="faq-answer">
+              <p>
+                いいえ。保存されるのは「ユーザー名」と各動作設定のみです。パスワード自体は一切保存せず、パスワード画面が表示された際に入力欄へ自動でカーソルを合わせる機能のみ動作します。保存されたデータはお使いのブラウザ内にのみ保持され、外部サーバーへ送信されることはありません。
+              </p>
+            </div>
+          </details>
+
+          <details class="faq-item">
+            <summary class="faq-question">
+              <span>「パスワードレス（FIDO2）」とは何ですか？よく分からない場合は？</span>
+              <svg class="faq-chevron" aria-hidden="true"><use href="#icon-chevron-down"></use></svg>
+            </summary>
+            <div class="faq-answer">
+              <p>
+                パソコンの指紋認証・顔認証・パスキー（Windows Hello 等）を使ってパスワードなしでログインする仕組みです。まだ設定していない場合やよく分からない場合は、上の 2 つのスイッチは<strong>両方 OFF のまま</strong>で問題ありません。
+              </p>
+              <p class="faq-sub-link">
+                設定してみたい場合は、大学公式の案内をご参照ください：
+                <a href="https://doshishaacjp.sharepoint.com/sites/it/mfa_manual/fido_manual.pdf" target="_blank" rel="noopener noreferrer">
+                  大学公式 パスワードレス認証設定マニュアル（PDF）
+                  <svg class="inline-external-icon" aria-hidden="true"><use href="#icon-external"></use></svg>
+                </a>
+              </p>
+            </div>
+          </details>
+
+          <details class="faq-item">
+            <summary class="faq-question">
+              <span>ポータルのレイアウトを変えたあと、元の状態に戻せますか？</span>
+              <svg class="faq-chevron" aria-hidden="true"><use href="#icon-chevron-down"></use></svg>
+            </summary>
+            <div class="faq-answer">
+              <p>
+                はい、いつでも元に戻せます。ポータル画面右下の「<strong>⚙</strong>」ボタンを押して編集モードを開き、右下に表示されるオレンジ色の「<strong>設定をリセット</strong>」ボタンをクリックすると初期状態に戻ります（ご自身で追加したオリジナルカードは削除されずに残ります）。
+              </p>
+            </div>
+          </details>
+
+          <details class="faq-item">
+            <summary class="faq-question">
+              <span>大学公式の拡張機能ですか？不具合が出た場合は？</span>
+              <svg class="faq-chevron" aria-hidden="true"><use href="#icon-chevron-down"></use></svg>
+            </summary>
+            <div class="faq-answer">
+              <p>
+                いいえ、個人によって開発された非公式の拡張機能であり、同志社大学とは関係ありません。大学ポータル側の仕様変更等により一部機能しなくなる場合があります。
+              </p>
+              <p class="faq-note">
+                もし動作がおかしい・不具合があると感じた場合は、一度本拡張機能を<strong>アンインストール（削除）してから再インストール</strong>をお試しください。
+              </p>
+            </div>
+          </details>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span>Better Portal for Doshisha（非公式ツール）</span>
+      <span>設定はブラウザ内に自動保存されます</span>
+    </footer>
+  </div>
+
+  <script src="index.js"></script>
+</body>
+</html>
