@@ -581,6 +581,9 @@ test("welcome/index.html contains required beginner guidance links, single short
   assert.match(html, /options-subgroup.*href="#faq-fido2"[^>]*data-open-faq="faq-fido2"/s);
   assert.match(html, /<details id="faq-fido2" class="faq-item">/);
   assert.match(html, /「パスワードレス（FIDO2）」とは何ですか？<\/span>/);
+  assert.match(html, /Windows Hello・Touch ID/);
+  assert.match(html, /イメージングマトリクス認証.*二段階認証.*不要になり/s);
+  assert.doesNotMatch(html, /上の 2 つのスイッチは<strong>両方 OFF のまま/);
   assert.match(html, /https:\/\/doshishaacjp\.sharepoint\.com\/sites\/it\/mfa_manual\/fido_manual\.pdf/);
   assert.match(html, /アンインストール/);
   assert.match(html, /再インストール/);
