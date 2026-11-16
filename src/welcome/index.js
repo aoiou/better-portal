@@ -34,7 +34,23 @@ document.addEventListener('DOMContentLoaded', async () => {
   const themeToggle = document.getElementById('theme-toggle');
   const themeMenu = document.getElementById('theme-menu');
   const themeMenuItems = document.querySelectorAll('.theme-menu-item');
+  const themeChoicesContainer = document.getElementById('theme-choices');
+  const themeChoices = document.querySelectorAll('.theme-choice');
   const versionText = document.getElementById('version-text');
+  const shortcutOsLabel = document.getElementById('shortcut-os-label');
+  const shortcutModKey = document.getElementById('shortcut-mod-key');
+  const shortcutKbdGroup = document.getElementById('shortcut-kbd-group');
+
+  const PLATFORM_SHORTCUTS = {
+    mac: { modKey: 'Option', osLabel: 'Mac' },
+    win: { modKey: 'Alt', osLabel: 'Windows' },
+    linux: { modKey: 'Alt', osLabel: 'Linux' },
+    cros: { modKey: 'Alt', osLabel: 'ChromeOS' },
+    openbsd: { modKey: 'Alt', osLabel: 'OpenBSD' },
+    android: { modKey: 'Alt', osLabel: '' },
+    fuchsia: { modKey: 'Alt', osLabel: '' },
+    unknown: { modKey: 'Alt', osLabel: '' }
+  };
 
   let feedbackTimeout = null;
   let debounceTimeout = null;
@@ -74,14 +90,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     themeToggle.setAttribute('aria-label', title);
   }
 
-  function updateThemeMenuUI(themeSetting) {
-    if (!themeMenuItems) return;
-    themeMenuItems.forEach((item) => {
-      const val = item.getAttribute('data-theme-value');
+  function syncThemeButtonGroup(buttons, themeSetting) {
+    if (!buttons) return;
+    buttons.forEach((btn) => {
+      const val = btn.getAttribute('data-theme-value');
       const isActive = val === themeSetting;
-      item.classList.toggle('active', isActive);
-      item.setAttribute('aria-checked', isActive ? 'true' : 'false');
+      btn.classList.toggle('active', isActive);
+      btn.setAttribute('aria-checked', isActive ? 'true' : 'false');
     });
+  }
+
+  function updateThemeMenuUI(themeSetting) {
+    syncThemeButtonGroup(themeMenuItems, themeSetting);
+    syncThemeButtonGroup(themeChoices, themeSetting);
   }
 
   async function setTheme(themeSetting) {
@@ -154,6 +175,59 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (err) {
       console.warn('[Better Portal] Failed to load version from manifest:', err);
       versionText.textContent = '';
+    }
+  }
+
+  function detectPlatformFromNavigator() {
+    const nav = typeof navigator !== 'undefined' ? navigator : null;
+    if (!nav) return 'unknown';
+
+    const uaDataPlatform = nav.userAgentData?.platform || '';
+    const platform = nav.platform || '';
+    const userAgent = nav.userAgent || '';
+
+    if (/mac/i.test(uaDataPlatform) || /mac/i.test(platform) || /macintosh|mac os x/i.test(userAgent)) {
+      return 'mac';
+    }
+    if (/win/i.test(uaDataPlatform) || /^win/i.test(platform) || /windows/i.test(userAgent)) {
+      return 'win';
+    }
+    if (/chrome os|cros/i.test(uaDataPlatform) || /cros/i.test(userAgent)) {
+      return 'cros';
+    }
+    if (/android/i.test(uaDataPlatform) || /android/i.test(userAgent)) {
+      return 'android';
+    }
+    if (/linux/i.test(uaDataPlatform) || /linux/i.test(platform) || /linux|x11/i.test(userAgent)) {
+      return 'linux';
+    }
+    return 'unknown';
+  }
+
+  async function resolvePlatformOs() {
+    const fallbackOs = detectPlatformFromNavigator();
+    try {
+      const info = await extBrowser?.runtime?.getPlatformInfo?.();
+      if (info?.os) {
+        return info.os;
+      }
+    } catch (err) {
+      console.warn('[Better Portal] Failed to load platform info:', err);
+    }
+    return fallbackOs;
+  }
+
+  function applyShortcutPlatform(os) {
+    const config = PLATFORM_SHORTCUTS[os] || PLATFORM_SHORTCUTS.unknown;
+    if (shortcutModKey) {
+      shortcutModKey.textContent = config.modKey;
+    }
+    if (shortcutOsLabel) {
+      shortcutOsLabel.textContent = config.osLabel;
+    }
+    if (shortcutKbdGroup) {
+      const label = config.osLabel ? `ショートカットキー (${config.osLabel})` : 'ショートカットキー';
+      shortcutKbdGroup.setAttribute('aria-label', `${label}: ${config.modKey} + Shift + D`);
     }
   }
 
@@ -286,6 +360,35 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
+  themeChoices.forEach((choice) => {
+    choice.addEventListener('click', async () => {
+      const val = choice.getAttribute('data-theme-value');
+      await setTheme(val);
+    });
+  });
+
+  themeChoicesContainer?.addEventListener('keydown', async (e) => {
+    const items = Array.from(themeChoices);
+    if (!items.length) return;
+    const currentIndex = items.indexOf(document.activeElement);
+    if (currentIndex === -1) return;
+
+    let nextIndex = -1;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      nextIndex = (currentIndex + 1) % items.length;
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      nextIndex = (currentIndex - 1 + items.length) % items.length;
+    }
+
+    if (nextIndex !== -1) {
+      e.preventDefault();
+      const nextChoice = items[nextIndex];
+      nextChoice?.focus();
+      const val = nextChoice?.getAttribute('data-theme-value');
+      if (val) await setTheme(val);
+    }
+  });
+
   themeMenu?.addEventListener('keydown', (e) => {
     const items = Array.from(themeMenuItems);
     const currentIndex = items.indexOf(document.activeElement);
@@ -360,5 +463,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 初期ロード
   renderVersion();
-  await loadSettings();
+  applyShortcutPlatform(detectPlatformFromNavigator());
+  await Promise.all([
+    loadSettings(),
+    resolvePlatformOs().then(applyShortcutPlatform)
+  ]);
 });

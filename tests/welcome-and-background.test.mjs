@@ -147,6 +147,9 @@ async function createWelcomeTestEnv({
   failSync = false,
   prefersDark = false,
   manifestVersion = "1.6.1",
+  platformOs = undefined,
+  failPlatformInfo = false,
+  navigatorMock = undefined,
 } = {}) {
   const syncStore = new Map(Object.entries(syncInitial));
   const localStore = new Map(Object.entries(localInitial));
@@ -193,19 +196,31 @@ async function createWelcomeTestEnv({
   const themeToggle = register("theme-toggle", "button");
   const themeMenu = register("theme-menu", "div");
   themeMenu.setAttribute("hidden", "");
+  const themeChoicesContainer = register("theme-choices", "div");
   const versionText = register("version-text", "span");
+  const shortcutOsLabel = register("shortcut-os-label", "span");
+  const shortcutModKey = register("shortcut-mod-key", "kbd");
+  const shortcutKbdGroup = register("shortcut-kbd-group", "span");
 
-  const themeMenuItems = ["system", "light", "dark"].map((val) => {
-    const item = createFakeNode("button");
-    item._doc = doc;
-    item.setAttribute("data-theme-value", val);
-    item.setAttribute("aria-checked", "false");
-    themeMenu._children.push(item);
-    return item;
-  });
+  const makeThemeButtons = (parent) =>
+    ["system", "light", "dark"].map((val) => {
+      const item = createFakeNode("button");
+      item._doc = doc;
+      item.setAttribute("data-theme-value", val);
+      item.setAttribute("aria-checked", "false");
+      parent._children.push(item);
+      return item;
+    });
+
+  const themeMenuItems = makeThemeButtons(themeMenu);
+  const themeChoices = makeThemeButtons(themeChoicesContainer);
 
   doc.getElementById = (id) => elementsById.get(id) || null;
-  doc.querySelectorAll = (sel) => (sel === ".theme-menu-item" ? themeMenuItems : []);
+  doc.querySelectorAll = (sel) => {
+    if (sel === ".theme-menu-item") return themeMenuItems;
+    if (sel === ".theme-choice") return themeChoices;
+    return [];
+  };
 
   const makeArea = (store, shouldFail) => ({
     async get(keys) {
@@ -232,6 +247,13 @@ async function createWelcomeTestEnv({
   const browserMock = {
     runtime: {
       getManifest: () => ({ version: manifestVersion }),
+      getPlatformInfo:
+        platformOs !== undefined || failPlatformInfo
+          ? async () => {
+              if (failPlatformInfo) throw new Error("getPlatformInfo failed");
+              return { os: platformOs };
+            }
+          : undefined,
     },
     storage: {
       sync: makeArea(syncStore, failSync),
@@ -262,6 +284,7 @@ async function createWelcomeTestEnv({
     document: doc,
     window: windowObj,
     browser: browserMock,
+    navigator: navigatorMock,
     console,
     setTimeout,
     clearTimeout,
@@ -291,7 +314,12 @@ async function createWelcomeTestEnv({
       themeToggle,
       themeMenu,
       themeMenuItems,
+      themeChoicesContainer,
+      themeChoices,
       versionText,
+      shortcutOsLabel,
+      shortcutModKey,
+      shortcutKbdGroup,
     },
     setOsDark(dark) {
       isPrefersDark = dark;
@@ -402,7 +430,7 @@ test("welcome/index.js saves username, handles IME/clear, enforces FIDO2 exclusi
   setOsDark(true);
   assert.equal(doc.documentElement.getAttribute("data-theme"), "dark");
 
-  // テーマメニューで明示選択し永続化
+  // テーマメニューで明示選択し永続化・初期設定内のテーマ選択肢とも同期
   elements.themeToggle.dispatchEvent({ type: "click" });
   assert.equal(elements.themeMenu.hasAttribute("hidden"), false);
   elements.themeMenuItems[1].dispatchEvent({ type: "click" });
@@ -410,6 +438,23 @@ test("welcome/index.js saves username, handles IME/clear, enforces FIDO2 exclusi
   assert.equal(syncStore.get("theme"), "light");
   assert.equal(doc.documentElement.getAttribute("data-theme"), "light");
   assert.equal(elements.themeMenu.hasAttribute("hidden"), true);
+  assert.equal(elements.themeChoices[1].classList.contains("active"), true);
+  assert.equal(elements.themeChoices[1].getAttribute("aria-checked"), "true");
+
+  // 初期設定内のテーマ選択肢クリックでも保存・メニュー同期
+  elements.themeChoices[2].dispatchEvent({ type: "click" });
+  await flushMicrotasks();
+  assert.equal(syncStore.get("theme"), "dark");
+  assert.equal(doc.documentElement.getAttribute("data-theme"), "dark");
+  assert.equal(elements.themeChoices[2].getAttribute("aria-checked"), "true");
+  assert.equal(elements.themeMenuItems[2].getAttribute("aria-checked"), "true");
+
+  // 矢印キーでのテーマ切り替え
+  elements.themeChoices[2].focus();
+  elements.themeChoicesContainer.dispatchEvent({ type: "keydown", key: "ArrowRight" });
+  await flushMicrotasks();
+  assert.equal(syncStore.get("theme"), "system");
+  assert.equal(elements.themeChoices[0].getAttribute("aria-checked"), "true");
 
   // 外部（ポップアップ等）からの storage.onChanged 同期
   doc.activeElement = doc.body;
@@ -433,11 +478,85 @@ test("welcome/index.js saves username, handles IME/clear, enforces FIDO2 exclusi
   assert.equal(elements.usernameInput.value, "typing_now");
 });
 
-test("welcome/index.html contains required beginner guidance links and shortcut callout", () => {
+test("welcome/index.js displays only the installed OS shortcut key via getPlatformInfo and navigator fallback", async () => {
+  const macEnv = await createWelcomeTestEnv({
+    platformOs: "mac",
+    navigatorMock: { platform: "Win32", userAgent: "Windows" },
+  });
+  assert.equal(macEnv.elements.shortcutModKey.textContent, "Option");
+  assert.equal(macEnv.elements.shortcutOsLabel.textContent, "Mac");
+  assert.equal(
+    macEnv.elements.shortcutKbdGroup.getAttribute("aria-label"),
+    "ショートカットキー (Mac): Option + Shift + D"
+  );
+
+  const winEnv = await createWelcomeTestEnv({ platformOs: "win" });
+  assert.equal(winEnv.elements.shortcutModKey.textContent, "Alt");
+  assert.equal(winEnv.elements.shortcutOsLabel.textContent, "Windows");
+  assert.equal(
+    winEnv.elements.shortcutKbdGroup.getAttribute("aria-label"),
+    "ショートカットキー (Windows): Alt + Shift + D"
+  );
+
+  const linuxEnv = await createWelcomeTestEnv({ platformOs: "linux" });
+  assert.equal(linuxEnv.elements.shortcutModKey.textContent, "Alt");
+  assert.equal(linuxEnv.elements.shortcutOsLabel.textContent, "Linux");
+
+  const crosEnv = await createWelcomeTestEnv({ platformOs: "cros" });
+  assert.equal(crosEnv.elements.shortcutModKey.textContent, "Alt");
+  assert.equal(crosEnv.elements.shortcutOsLabel.textContent, "ChromeOS");
+
+  const navMacFallbackEnv = await createWelcomeTestEnv({
+    failPlatformInfo: true,
+    navigatorMock: { platform: "MacIntel", userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X)" },
+  });
+  assert.equal(navMacFallbackEnv.elements.shortcutModKey.textContent, "Option");
+  assert.equal(navMacFallbackEnv.elements.shortcutOsLabel.textContent, "Mac");
+
+  const navAndroidFallbackEnv = await createWelcomeTestEnv({
+    navigatorMock: { platform: "Linux armv81", userAgent: "Mozilla/5.0 (Linux; Android 14)" },
+  });
+  assert.equal(navAndroidFallbackEnv.elements.shortcutModKey.textContent, "Alt");
+  assert.equal(navAndroidFallbackEnv.elements.shortcutOsLabel.textContent, "");
+
+  const unknownFallbackEnv = await createWelcomeTestEnv();
+  assert.equal(unknownFallbackEnv.elements.shortcutModKey.textContent, "Alt");
+  assert.equal(unknownFallbackEnv.elements.shortcutOsLabel.textContent, "");
+  assert.equal(
+    unknownFallbackEnv.elements.shortcutKbdGroup.getAttribute("aria-label"),
+    "ショートカットキー: Alt + Shift + D"
+  );
+});
+
+test("welcome/index.html contains required beginner guidance links, single shortcut callout, and excludes removed text/buttons", () => {
   const html = fs.readFileSync(path.join(SRC_DIR, "welcome/index.html"), "utf8");
-  assert.match(html, /Alt<\/kbd>.*Shift<\/kbd>.*D<\/kbd>/s);
-  assert.match(html, /Option<\/kbd>.*Shift<\/kbd>.*D<\/kbd>/s);
+  const css = fs.readFileSync(path.join(SRC_DIR, "welcome/index.css"), "utf8");
+
+  const shortcutCombos = html.match(/class="shortcut-combo"/g) || [];
+  assert.equal(shortcutCombos.length, 1);
+  assert.match(html, /id="shortcut-mod-key"[^>]*>Alt<\/kbd>.*Shift<\/kbd>.*D<\/kbd>/s);
+  assert.doesNotMatch(html, /Option<\/kbd>/);
+  assert.match(html, /class="shortcut-or">または<\/p>.*id="open-login-link"/s);
+  assert.match(html, /id="open-login-link"/);
+  assert.doesNotMatch(html, /open-portal-link/);
+  assert.doesNotMatch(html, /ポータル画面を開く/);
+  assert.doesNotMatch(html, /約30秒/);
+  assert.doesNotMatch(html, /入力を止めて1秒後、またはEnterで自動保存/);
+  assert.doesNotMatch(html, /覚えておくと便利な2つのポイント/);
+  assert.doesNotMatch(html, /外観テーマ（ダークモード）/);
+  assert.doesNotMatch(html, /パスワードも保存しません/);
+  assert.match(html, /パスワードは保存しません/);
+  assert.match(html, /id="theme-setting-label"[^>]*>外観テーマ<\/span>/);
+  assert.match(html, /id="theme-choices"/);
+  assert.match(html, /class="card setup-card".*id="theme-choices".*<\/section>\s*<!-- Section 2: 今すぐ試してみよう -->\s*<section class="card try-card"/s);
+  assert.match(html, /上の設定が反映されているか確認してみよう/);
+  assert.match(html, /パスワードは保存されますか？/);
+  assert.match(html, /パスワードは保存されますか？.*より快適にログインしたい場合は.*パスワードレス認証の利用をご検討ください/s);
+  assert.equal(html.match(/fido_manual\.pdf/g)?.length, 1);
+  assert.match(html, /「パスワードレス（FIDO2）」とは何ですか？<\/span>/);
   assert.match(html, /https:\/\/doshishaacjp\.sharepoint\.com\/sites\/it\/mfa_manual\/fido_manual\.pdf/);
   assert.match(html, /アンインストール/);
   assert.match(html, /再インストール/);
+  assert.match(css, /\.os-label\s*\{[^}]*position:\s*absolute;\s*top:\s*10px;\s*left:\s*12px;/s);
+  assert.match(css, /kbd\s*\{[^}]*font-size:\s*clamp\(15px,\s*4\.3vw,\s*34px\)/s);
 });

@@ -95,23 +95,23 @@
         <span class="status-pill">インストール完了</span>
         <h1 id="hero-title" class="hero-title">同志社ポータルを、もっと快適に。</h1>
         <p class="hero-lead">
-          ログイン時のユーザー名自動入力や、ポータル画面の並び替え・ダークモードが使えるようになりました。まずは下の初期設定（約30秒）を済ませてみましょう。
+          ログイン時のユーザー名自動入力や、ポータル画面の並び替え・ダークモードが使えるようになりました。まずは下の初期設定を済ませてみましょう。
         </p>
         <div class="privacy-banner" role="note">
           <svg class="privacy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
           </svg>
           <p>
-            入力したユーザー名や設定はお使いのブラウザ内にのみ保存され、<strong>外部サーバーへ送信されることはありません</strong>（パスワードも保存しません）。※本拡張機能は個人開発の非公式ツールです。
+            入力したユーザー名や設定はお使いのブラウザ内にのみ保存され、<strong>外部サーバーへ送信されることはありません</strong>（パスワードは保存しません）。※本拡張機能は個人開発の非公式ツールです。
           </p>
         </div>
       </section>
 
-      <!-- Section 1: 初期設定フォーム + ショートカットお試し -->
+      <!-- Section 1: 初期設定フォーム -->
       <section class="card setup-card" aria-labelledby="setup-heading">
         <div class="section-header">
           <span class="step-badge">初期設定</span>
-          <h2 id="setup-heading" class="section-title">ログイン自動入力を設定する</h2>
+          <h2 id="setup-heading" class="section-title">ログイン自動入力と外観テーマを設定する</h2>
           <p class="section-desc">
             ここで変更した内容はすべて自動で保存され、ツールバーの拡張機能アイコンから開く設定画面とも連動します。
           </p>
@@ -149,7 +149,7 @@
               </div>
             </div>
             <p class="form-hint">
-              ログイン画面を開いた際に「ユーザー名」欄へ自動入力されます（入力を止めて1秒後、またはEnterで自動保存）。
+              ログイン画面を開いた際に「ユーザー名」欄へ自動入力されます。
             </p>
           </div>
 
@@ -211,44 +211,69 @@
             </div>
           </div>
 
-          <!-- Try Shortcut CTA -->
-          <div class="shortcut-callout" aria-labelledby="try-shortcut-title">
-            <div class="shortcut-callout-header">
-              <span class="try-badge">今すぐ試してみよう</span>
-              <h3 id="try-shortcut-title" class="shortcut-title">ショートカットキーでいつでもログイン画面を開く</h3>
+          <!-- Theme Setting -->
+          <div class="form-group theme-setting-group">
+            <span id="theme-setting-label" class="form-label">外観テーマ</span>
+            <div id="theme-choices" class="theme-choices" role="radiogroup" aria-labelledby="theme-setting-label">
+              <button type="button" class="theme-choice" data-theme-value="system" role="radio" aria-checked="false">
+                <svg class="theme-choice-icon" aria-hidden="true"><use href="#icon-system"></use></svg>
+                <span class="theme-choice-text">
+                  <span class="theme-choice-title">システム設定</span>
+                  <span class="theme-choice-desc">OS設定に連動</span>
+                </span>
+              </button>
+              <button type="button" class="theme-choice" data-theme-value="light" role="radio" aria-checked="false">
+                <svg class="theme-choice-icon" aria-hidden="true"><use href="#icon-sun"></use></svg>
+                <span class="theme-choice-text">
+                  <span class="theme-choice-title">ライト</span>
+                  <span class="theme-choice-desc">明るい表示</span>
+                </span>
+              </button>
+              <button type="button" class="theme-choice" data-theme-value="dark" role="radio" aria-checked="false">
+                <svg class="theme-choice-icon" aria-hidden="true"><use href="#icon-moon"></use></svg>
+                <span class="theme-choice-text">
+                  <span class="theme-choice-title">ダーク</span>
+                  <span class="theme-choice-desc">暗い表示</span>
+                </span>
+              </button>
             </div>
-            <div class="shortcut-keys-row">
-              <div class="shortcut-combo">
-                <span class="os-label">Windows / Linux</span>
-                <span class="kbd-group"><kbd>Alt</kbd><span class="plus">+</span><kbd>Shift</kbd><span class="plus">+</span><kbd>D</kbd></span>
-              </div>
-              <div class="shortcut-combo">
-                <span class="os-label">Mac</span>
-                <span class="kbd-group"><kbd>Option</kbd><span class="plus">+</span><kbd>Shift</kbd><span class="plus">+</span><kbd>D</kbd></span>
-              </div>
-            </div>
-            <p class="shortcut-desc">
-              別のサイトを見ているときでも、このキーを押すだけで同志社ログイン画面が開き、上の設定ですぐに自動入力されます。今すぐキーを押して動作を試してみてください！
+            <p class="form-hint">
+              ログイン画面やポータル画面など、拡張機能が適用されるすべての画面に反映されます。
             </p>
-            <div class="shortcut-fallback-links">
-              <a href="https://doshisha.ex-tic.com/auth/session" id="open-login-link" class="link-pill" target="_blank" rel="noopener noreferrer">
-                <span>クリックしてログイン画面を開く</span>
-                <svg class="external-icon" aria-hidden="true"><use href="#icon-external"></use></svg>
-              </a>
-              <a href="https://doshisha.ex-tic.com/idm/user/portal/" id="open-portal-link" class="link-pill link-pill-secondary" target="_blank" rel="noopener noreferrer">
-                <span>ポータル画面を開く</span>
-                <svg class="external-icon" aria-hidden="true"><use href="#icon-external"></use></svg>
-              </a>
-            </div>
           </div>
         </div>
       </section>
 
-      <!-- Section 2: 基本の使い方 -->
+      <!-- Section 2: 今すぐ試してみよう -->
+      <section class="card try-card" aria-labelledby="try-shortcut-title">
+        <div class="section-header">
+          <span class="try-badge">今すぐ試してみよう</span>
+          <h2 id="try-shortcut-title" class="section-title">上の設定が反映されているか確認してみよう</h2>
+        </div>
+        <div class="shortcut-combo">
+          <span id="shortcut-os-label" class="os-label"></span>
+          <span id="shortcut-kbd-group" class="kbd-group" aria-label="ショートカットキー: Alt + Shift + D">
+            <kbd id="shortcut-mod-key">Alt</kbd><span class="plus">+</span><kbd>Shift</kbd><span class="plus">+</span><kbd>D</kbd>
+          </span>
+        </div>
+        <p class="shortcut-desc">
+          このショートカットキーを押してログイン画面を開き、上で設定したユーザー名の自動入力や各オプションが正しく反映されているか試してみてください。別のサイトを見ているときでも、いつでもこのキーでログイン画面を開けます。
+        </p>
+        <div class="shortcut-fallback">
+          <p class="shortcut-or">または</p>
+          <div class="shortcut-fallback-links">
+            <a href="https://doshisha.ex-tic.com/auth/session" id="open-login-link" class="link-pill" target="_blank" rel="noopener noreferrer">
+              <span>クリックしてログイン画面を開く</span>
+              <svg class="external-icon" aria-hidden="true"><use href="#icon-external"></use></svg>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 3: 基本の使い方 -->
       <section class="card" aria-labelledby="tips-heading">
         <div class="section-header">
-          <span class="step-badge">基本の使い方</span>
-          <h2 id="tips-heading" class="section-title">覚えておくと便利な2つのポイント</h2>
+          <span id="tips-heading" class="step-badge">基本の使い方</span>
         </div>
 
         <div class="tips-grid">
@@ -270,7 +295,7 @@
         </div>
       </section>
 
-      <!-- Section 3: よくある質問 (FAQ) -->
+      <!-- Section 4: よくある質問 (FAQ) -->
       <section class="card" aria-labelledby="faq-heading">
         <div class="section-header">
           <span class="step-badge">Q &amp; A</span>
@@ -280,19 +305,22 @@
         <div class="faq-list">
           <details class="faq-item">
             <summary class="faq-question">
-              <span>パスワードも保存されますか？</span>
+              <span>パスワードは保存されますか？</span>
               <svg class="faq-chevron" aria-hidden="true"><use href="#icon-chevron-down"></use></svg>
             </summary>
             <div class="faq-answer">
               <p>
                 いいえ。保存されるのは「ユーザー名」と各動作設定のみです。パスワード自体は一切保存せず、パスワード画面が表示された際に入力欄へ自動でカーソルを合わせる機能のみ動作します。保存されたデータはお使いのブラウザ内にのみ保持され、外部サーバーへ送信されることはありません。
               </p>
+              <p>
+                毎回のパスワード入力を省いてより快適にログインしたい場合は、下の「<strong>「パスワードレス（FIDO2）」とは何ですか？</strong>」をご参照の上、パスワードレス認証の利用をご検討ください。
+              </p>
             </div>
           </details>
 
           <details class="faq-item">
             <summary class="faq-question">
-              <span>「パスワードレス（FIDO2）」とは何ですか？よく分からない場合は？</span>
+              <span>「パスワードレス（FIDO2）」とは何ですか？</span>
               <svg class="faq-chevron" aria-hidden="true"><use href="#icon-chevron-down"></use></svg>
             </summary>
             <div class="faq-answer">
