@@ -20,7 +20,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  const LOGIN_URL = 'https://doshisha.ex-tic.com/auth/session';
+  const PORTAL_URL = 'https://doshisha.ex-tic.com/idm/user/portal/';
+  const OPEN_PORTAL_MESSAGE_TYPE = 'bp-open-portal';
   const DEBOUNCE_DELAY = 1000;
   const FEEDBACK_DURATION = 1800;
 
@@ -364,11 +365,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // 9. 対象ドメインクリック：ログインページを新規タブで開く
+  // 9. 対象ドメインクリック：既存ポータルタブへ移動（未開・失敗時は新規タブで開く）
   if (targetDomainLink) {
-    targetDomainLink.addEventListener('click', (e) => {
+    targetDomainLink.addEventListener('click', async (e) => {
       e.preventDefault();
-      browser.tabs.create({ url: LOGIN_URL });
+      try {
+        if (browser.runtime?.sendMessage) {
+          await browser.runtime.sendMessage({ type: OPEN_PORTAL_MESSAGE_TYPE });
+        } else {
+          await browser.tabs.create({ url: PORTAL_URL });
+        }
+      } catch {
+        try {
+          await browser.tabs.create({ url: PORTAL_URL });
+        } catch (err) {
+          console.error('Failed to open portal:', err);
+        }
+      } finally {
+        window.close?.();
+      }
     });
   }
 

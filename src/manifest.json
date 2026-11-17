@@ -32,6 +32,9 @@
   "permissions": [
     "storage"
   ],
+  "host_permissions": [
+    "https://doshisha.ex-tic.com/idm/user/portal/*"
+  ],
   "background": {
     "scripts": [
       "background.js"
@@ -39,12 +42,12 @@
     "service_worker": "background.js"
   },
   "commands": {
-    "open-login-page": {
+    "open-portal-page": {
       "suggested_key": {
         "default": "Alt+Shift+D",
         "mac": "Alt+Shift+D"
       },
-      "description": "同志社ログイン画面を開く"
+      "description": "同志社ポータルを開く（開いていれば移動）"
     }
   },
   "content_scripts": [

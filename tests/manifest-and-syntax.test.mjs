@@ -14,6 +14,11 @@ test("manifest.json is valid and all referenced assets exist in src/", () => {
   assert.ok(fs.existsSync(path.join(SRC_DIR, manifest.action.default_popup)));
   assert.ok(fs.existsSync(path.join(SRC_DIR, manifest.background.service_worker)));
 
+  assert.equal(manifest.permissions.includes("tabs"), false);
+  assert.deepEqual(manifest.host_permissions, ["https://doshisha.ex-tic.com/idm/user/portal/*"]);
+  assert.ok(manifest.commands?.["open-portal-page"]);
+  assert.equal(manifest.commands?.["open-login-page"], undefined);
+
   for (const iconPath of Object.values(manifest.icons)) {
     assert.ok(fs.existsSync(path.join(SRC_DIR, iconPath)), `Missing icon: ${iconPath}`);
   }
