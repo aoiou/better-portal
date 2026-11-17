@@ -9,10 +9,28 @@ function flushMicrotasks() {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-function loadBackgroundEnv({ failTabsCreate = false } = {}) {
+function loadBackgroundEnv({
+  failTabsCreate = false,
+  failTabsQuery = false,
+  failTabsUpdate = false,
+  tabs = [],
+  currentWindowId = 1,
+} = {}) {
   const installedListeners = [];
   const commandListeners = [];
+  const messageListeners = [];
   const createdTabs = [];
+  const updatedTabs = [];
+  const updatedWindows = [];
+  const queryCalls = [];
+
+  const matchesPattern = (url, pattern) => {
+    if (!pattern) return true;
+    if (pattern.endsWith("*")) {
+      return typeof url === "string" && url.startsWith(pattern.slice(0, -1));
+    }
+    return url === pattern;
+  };
 
   const browserMock = {
     runtime: {
@@ -24,6 +42,11 @@ function loadBackgroundEnv({ failTabsCreate = false } = {}) {
           installedListeners.push(fn);
         },
       },
+      onMessage: {
+        addListener(fn) {
+          messageListeners.push(fn);
+        },
+      },
     },
     commands: {
       onCommand: {
@@ -33,12 +56,47 @@ function loadBackgroundEnv({ failTabsCreate = false } = {}) {
       },
     },
     tabs: {
+      async query(queryInfo = {}) {
+        queryCalls.push(queryInfo);
+        if (failTabsQuery && queryInfo.url) {
+          throw new Error("tabs.query failed");
+        }
+        return tabs
+          .filter((tab) => {
+            if (queryInfo.currentWindow && tab.windowId !== currentWindowId) return false;
+            if (queryInfo.active !== undefined && Boolean(tab.active) !== Boolean(queryInfo.active)) {
+              return false;
+            }
+            if (queryInfo.url) {
+              const effectiveUrl = tab.pendingUrl || tab.url;
+              if (!matchesPattern(effectiveUrl, queryInfo.url)) return false;
+            }
+            return true;
+          })
+          .map((tab) => ({ ...tab }));
+      },
+      async update(tabId, updateProperties) {
+        updatedTabs.push({ tabId, ...updateProperties });
+        if (failTabsUpdate) {
+          throw new Error("tabs.update failed");
+        }
+        const target = tabs.find((t) => t.id === tabId);
+        if (!target) throw new Error(`Tab not found: ${tabId}`);
+        Object.assign(target, updateProperties);
+        return { ...target };
+      },
       create(opts) {
         createdTabs.push(opts);
         if (failTabsCreate) {
           return Promise.reject(new Error("tab creation failed"));
         }
-        return Promise.resolve({ id: createdTabs.length, ...opts });
+        return Promise.resolve({ id: 100 + createdTabs.length, ...opts });
+      },
+    },
+    windows: {
+      async update(windowId, updateInfo) {
+        updatedWindows.push({ windowId, ...updateInfo });
+        return { id: windowId, ...updateInfo };
       },
     },
   };
@@ -52,7 +110,15 @@ function loadBackgroundEnv({ failTabsCreate = false } = {}) {
   const code = fs.readFileSync(path.join(SRC_DIR, "background.js"), "utf8");
   vm.runInContext(code, context, { filename: "src/background.js" });
 
-  return { installedListeners, commandListeners, createdTabs };
+  return {
+    installedListeners,
+    commandListeners,
+    messageListeners,
+    createdTabs,
+    updatedTabs,
+    updatedWindows,
+    queryCalls,
+  };
 }
 
 function createFakeNode(tagName, id = "") {
@@ -345,28 +411,238 @@ async function createWelcomeTestEnv({
   };
 }
 
-test("background.js opens welcome page only on fresh install and keeps shortcut handler", async () => {
-  const { installedListeners, commandListeners, createdTabs } = loadBackgroundEnv();
+test("background.js opens welcome page only on fresh install and routes open-portal-page / message to existing or new portal tab", async () => {
+  const PORTAL_URL = "https://doshisha.ex-tic.com/idm/user/portal/";
 
-  assert.equal(installedListeners.length, 1);
-  assert.equal(commandListeners.length, 1);
+  // 1. 初回インストールのみウェルカムを開き、ポータル未開時は新規タブを作成
+  const freshEnv = loadBackgroundEnv({
+    currentWindowId: 1,
+    tabs: [{ id: 10, windowId: 1, active: true, incognito: false, url: "https://example.com/" }],
+  });
 
-  installedListeners[0]({ reason: "update" });
-  installedListeners[0]({ reason: "browser_update" });
-  assert.equal(createdTabs.length, 0);
+  assert.equal(freshEnv.installedListeners.length, 1);
+  assert.equal(freshEnv.commandListeners.length, 1);
+  assert.equal(freshEnv.messageListeners.length, 1);
 
-  installedListeners[0]({ reason: "install" });
-  assert.equal(createdTabs.length, 1);
-  assert.equal(createdTabs[0].url, "extension://unit-test/welcome/index.html");
+  freshEnv.installedListeners[0]({ reason: "update" });
+  freshEnv.installedListeners[0]({ reason: "browser_update" });
+  assert.equal(freshEnv.createdTabs.length, 0);
 
-  commandListeners[0]("open-login-page");
-  assert.equal(createdTabs.length, 2);
-  assert.equal(createdTabs[1].url, "https://doshisha.ex-tic.com/auth/session");
+  freshEnv.installedListeners[0]({ reason: "install" });
+  assert.equal(freshEnv.createdTabs.length, 1);
+  assert.equal(freshEnv.createdTabs[0].url, "extension://unit-test/welcome/index.html");
 
+  freshEnv.commandListeners[0]("open-portal-page");
+  await flushMicrotasks();
+  assert.equal(freshEnv.createdTabs.length, 2);
+  assert.equal(freshEnv.createdTabs[1].url, PORTAL_URL);
+  assert.equal(freshEnv.updatedTabs.length, 0);
+
+  // 2. 現在のアクティブタブがすでにポータルなら何もしない
+  const alreadyPortalEnv = loadBackgroundEnv({
+    currentWindowId: 1,
+    tabs: [{ id: 1, windowId: 1, active: true, incognito: false, url: PORTAL_URL }],
+  });
+  alreadyPortalEnv.commandListeners[0]("open-portal-page");
+  await flushMicrotasks();
+  assert.equal(alreadyPortalEnv.updatedTabs.length, 0);
+  assert.equal(alreadyPortalEnv.updatedWindows.length, 0);
+  assert.equal(alreadyPortalEnv.createdTabs.length, 0);
+
+  // 3. 現在ウィンドウ内のバックグラウンドタブ（lastAccessed最新）を優先し、他ウィンドウより優先
+  const sameWindowEnv = loadBackgroundEnv({
+    currentWindowId: 1,
+    tabs: [
+      { id: 1, windowId: 1, active: true, incognito: false, url: "https://example.com/" },
+      { id: 2, windowId: 1, active: false, incognito: false, index: 1, lastAccessed: 100, url: PORTAL_URL },
+      { id: 3, windowId: 1, active: false, incognito: false, index: 2, lastAccessed: 500, url: `${PORTAL_URL}#notices` },
+      { id: 4, windowId: 2, active: true, incognito: false, lastAccessed: 999, url: PORTAL_URL },
+    ],
+  });
+  sameWindowEnv.commandListeners[0]("open-portal-page");
+  await flushMicrotasks();
+  assert.deepEqual(sameWindowEnv.updatedTabs, [{ tabId: 3, active: true }]);
+  assert.equal(sameWindowEnv.updatedWindows.length, 0);
+  assert.equal(sameWindowEnv.createdTabs.length, 0);
+
+  // 4. 別ウィンドウにのみ同 incognito のポータルがある場合はウィンドウごと前面化（incognito違いは越境しない）
+  const crossWindowEnv = loadBackgroundEnv({
+    currentWindowId: 1,
+    tabs: [
+      { id: 1, windowId: 1, active: true, incognito: false, url: "https://example.com/" },
+      { id: 2, windowId: 2, active: true, incognito: true, lastAccessed: 999, url: PORTAL_URL },
+      { id: 3, windowId: 3, active: true, incognito: false, lastAccessed: 300, url: PORTAL_URL },
+    ],
+  });
+  const msgResult = await crossWindowEnv.messageListeners[0]({ type: "bp-open-portal" });
+  assert.equal(msgResult.action, "focused");
+  assert.deepEqual(crossWindowEnv.updatedTabs, [{ tabId: 3, active: true }]);
+  assert.deepEqual(crossWindowEnv.updatedWindows, [{ windowId: 3, focused: true }]);
+  assert.equal(crossWindowEnv.createdTabs.length, 0);
+  assert.equal(crossWindowEnv.messageListeners[0]({ type: "unrelated" }), undefined);
+
+  // 5. incognito ウィンドウからは通常ウィンドウのポータルタブへ越境せず新規タブを開く
+  const incognitoIsolationEnv = loadBackgroundEnv({
+    currentWindowId: 2,
+    tabs: [
+      { id: 1, windowId: 1, active: true, incognito: false, url: PORTAL_URL },
+      { id: 2, windowId: 2, active: true, incognito: true, url: "https://example.com/" },
+    ],
+  });
+  incognitoIsolationEnv.commandListeners[0]("open-portal-page");
+  await flushMicrotasks();
+  assert.equal(incognitoIsolationEnv.updatedTabs.length, 0);
+  assert.equal(incognitoIsolationEnv.createdTabs.length, 1);
+  assert.equal(incognitoIsolationEnv.createdTabs[0].url, PORTAL_URL);
+
+  // 6. tabs.query / tabs.update が失敗しても新規タブ作成へ安全にフォールバックする
+  const queryFailEnv = loadBackgroundEnv({ failTabsQuery: true });
+  queryFailEnv.commandListeners[0]("open-portal-page");
+  await flushMicrotasks();
+  assert.equal(queryFailEnv.createdTabs.length, 1);
+  assert.equal(queryFailEnv.createdTabs[0].url, PORTAL_URL);
+
+  const updateFailEnv = loadBackgroundEnv({
+    failTabsUpdate: true,
+    currentWindowId: 1,
+    tabs: [
+      { id: 1, windowId: 1, active: true, incognito: false, url: "https://example.com/" },
+      { id: 2, windowId: 1, active: false, incognito: false, url: PORTAL_URL },
+    ],
+  });
+  updateFailEnv.commandListeners[0]("open-portal-page");
+  await flushMicrotasks();
+  assert.equal(updateFailEnv.createdTabs.length, 1);
+  assert.equal(updateFailEnv.createdTabs[0].url, PORTAL_URL);
+
+  // 7. onInstalled の tabs.create 失敗時も未処理拒否にならない
   const failingEnv = loadBackgroundEnv({ failTabsCreate: true });
   failingEnv.installedListeners[0]({ reason: "install" });
   await flushMicrotasks();
   assert.equal(failingEnv.createdTabs.length, 1);
+});
+
+test("popup/index.js routes target-domain-link click through background message with new-tab fallback and closes popup", async () => {
+  const createPopupEnv = ({ failSendMessage = false } = {}) => {
+    const docListeners = new Map();
+    const sentMessages = [];
+    const createdTabs = [];
+    let closedCount = 0;
+
+    const doc = {
+      activeElement: null,
+      body: createFakeNode("body"),
+      documentElement: createFakeNode("html"),
+      addEventListener(type, fn) {
+        if (!docListeners.has(type)) docListeners.set(type, []);
+        docListeners.get(type).push(fn);
+      },
+      dispatchEvent(event) {
+        const ev = { preventDefault() {}, stopPropagation() {}, ...event };
+        for (const fn of docListeners.get(ev.type) || []) fn.call(doc, ev);
+      },
+    };
+    doc.activeElement = doc.body;
+
+    const elementsById = new Map();
+    const register = (id, tag = "div") => {
+      const el = createFakeNode(tag, id);
+      el._doc = doc;
+      elementsById.set(id, el);
+      return el;
+    };
+
+    const usernameInput = register("username-input", "input");
+    const clearBtn = register("clear-btn", "button");
+    const saveIndicator = register("save-indicator", "span");
+    register("auto-submit-toggle", "input");
+    register("auto-fido2-toggle", "input");
+    register("auto-password-tab-toggle", "input");
+    register("theme-toggle", "button");
+    const themeMenu = register("theme-menu", "div");
+    themeMenu.setAttribute("hidden", "");
+    const targetDomainLink = register("target-domain-link", "a");
+    register("version-text", "span");
+
+    doc.getElementById = (id) => elementsById.get(id) || null;
+    doc.querySelectorAll = () => [];
+
+    const browserMock = {
+      runtime: {
+        getManifest: () => ({ version: "1.7.0" }),
+        async sendMessage(msg) {
+          sentMessages.push(msg);
+          if (failSendMessage) throw new Error("background unavailable");
+          return { action: "focused" };
+        },
+      },
+      storage: {
+        sync: { async get() { return {}; }, async set() {} },
+        local: { async get() { return {}; }, async set() {} },
+      },
+      tabs: {
+        async create(opts) {
+          createdTabs.push(opts);
+          return { id: createdTabs.length, ...opts };
+        },
+      },
+    };
+
+    const windowObj = {
+      close() {
+        closedCount += 1;
+      },
+      matchMedia: () => ({ matches: false, addEventListener() {} }),
+    };
+
+    const context = vm.createContext({
+      document: doc,
+      window: windowObj,
+      browser: browserMock,
+      console: { log() {}, warn() {}, error() {} },
+      setTimeout,
+      clearTimeout,
+      Promise,
+      Array,
+      Object,
+    });
+
+    const code = fs.readFileSync(path.join(SRC_DIR, "popup/index.js"), "utf8");
+    vm.runInContext(code, context, { filename: "src/popup/index.js" });
+
+    return {
+      doc,
+      targetDomainLink,
+      sentMessages,
+      createdTabs,
+      getClosedCount: () => closedCount,
+    };
+  };
+
+  const normalEnv = createPopupEnv();
+  normalEnv.doc.dispatchEvent({ type: "DOMContentLoaded" });
+  await flushMicrotasks();
+
+  normalEnv.targetDomainLink.dispatchEvent({ type: "click" });
+  await flushMicrotasks();
+  assert.equal(normalEnv.sentMessages.length, 1);
+  assert.equal(normalEnv.sentMessages[0].type, "bp-open-portal");
+  assert.equal(normalEnv.createdTabs.length, 0);
+  assert.equal(normalEnv.getClosedCount(), 1);
+
+  const fallbackEnv = createPopupEnv({ failSendMessage: true });
+  fallbackEnv.doc.dispatchEvent({ type: "DOMContentLoaded" });
+  await flushMicrotasks();
+
+  fallbackEnv.targetDomainLink.dispatchEvent({ type: "click" });
+  await flushMicrotasks();
+  assert.equal(fallbackEnv.sentMessages.length, 1);
+  assert.equal(fallbackEnv.createdTabs.length, 1);
+  assert.equal(fallbackEnv.createdTabs[0].url, "https://doshisha.ex-tic.com/idm/user/portal/");
+  assert.equal(fallbackEnv.getClosedCount(), 1);
+
+  const popupHtml = fs.readFileSync(path.join(SRC_DIR, "popup/index.html"), "utf8");
+  assert.match(popupHtml, /href="https:\/\/doshisha\.ex-tic\.com\/idm\/user\/portal\/"[^>]*id="target-domain-link"/);
 });
 
 test("welcome/index.js loads initial settings, supports local fallback, and renders manifest version", async () => {
@@ -561,10 +837,11 @@ test("welcome/index.html contains required beginner guidance links, single short
   assert.equal(shortcutCombos.length, 1);
   assert.match(html, /id="shortcut-mod-key"[^>]*>Alt<\/kbd>.*Shift<\/kbd>.*D<\/kbd>/s);
   assert.doesNotMatch(html, /Option<\/kbd>/);
-  assert.match(html, /class="shortcut-or">または<\/p>.*id="open-login-link"/s);
-  assert.match(html, /id="open-login-link"/);
-  assert.doesNotMatch(html, /open-portal-link/);
-  assert.doesNotMatch(html, /ポータル画面を開く/);
+  assert.match(html, /class="shortcut-or">または<\/p>.*id="open-portal-link"/s);
+  assert.match(html, /href="https:\/\/doshisha\.ex-tic\.com\/idm\/user\/portal\/"[^>]*id="open-portal-link"/);
+  assert.match(html, /ポータル画面を開く/);
+  assert.doesNotMatch(html, /open-login-link/);
+  assert.doesNotMatch(html, /リダイレクト/);
   assert.doesNotMatch(html, /約30秒/);
   assert.doesNotMatch(html, /入力を止めて1秒後、またはEnterで自動保存/);
   assert.doesNotMatch(html, /覚えておくと便利な2つのポイント/);

@@ -76,6 +76,12 @@ Firefox は `background.service_worker` を未サポートです（[Firefox bug 
 
 並び替え結果の保存コールバック（`onOrderCommit`）はドロップ後の整列（settle）アニメーション完了を待たず `pointerup` 時点で即座に呼び出しており、整列中に編集モードを終了しても新しい並び順が確実に永続化されます。また、`portal/content.js` の `cardById` マップにより、リセットや再描画時もオリジナルカードの DOM 要素・画像ノードを再利用して不要な再生成を防いでいます。
 
+## ポータル帰還キーと最小権限 (`host_permissions`) 設計
+
+ショートカットキー（`open-portal-page`）およびポップアップのドメインバッジから既存のポータルタブへ遷移するにあたり、全タブの閲覧情報へアクセスできる `"tabs"` 権限は付与せず、`manifest.json` の `host_permissions` に `"https://doshisha.ex-tic.com/idm/user/portal/*"` のみを指定しています（既存の `content_scripts` が要求する `/idm/user/*` に包含される最小範囲）。
+
+`src/background.js` の `openOrFocusPortal()` では、現在ウィンドウを優先してポータルタブを探し（すでにアクティブな場合は `noop`、バックグラウンドにあれば `lastAccessed` 優先で前面化、他ウィンドウにのみある場合は同 `incognito` 境界内に限ってウィンドウごと前面化）、該当タブが無い場合や API 呼び出しに失敗した場合は `browser.tabs.create` へフォールバックします。ポップアップ（`src/popup/index.js`）からは `browser.runtime.sendMessage` 経由で同一ロジックを呼び出し、ロジック重複とウィンドウ閉じタイミングによる処理中断を防いでいます。
+
 ## 自動テストの実行
 
 外部パッケージへの依存はなく、Node.js 標準のテストランナー（`node:test`）のみで実行できます。
