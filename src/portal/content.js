@@ -26,7 +26,27 @@
   let hiddenSectionRef = null;
   let addCardCol = null;
   let dragController = null;
+  let initialPortalOrder = [];
   const cardById = new Map();
+
+  /**
+   * ページ初回ロード時の標準カード順を基準として標準カード要素一覧を返す。
+   * 並び替えや非表示セクションへの移動後にリセットしても無編集時の並びへ戻せるようにする。
+   */
+  function getPortalCardsInInitialOrder() {
+    const currentCards = [...document.querySelectorAll(CONSTANTS.SELECTOR.SERVICE_CARDS)];
+    if (initialPortalOrder.length === 0) {
+      if (currentCards.length > 0) {
+        initialPortalOrder = currentCards.map((el) => el.id);
+      }
+      return currentCards;
+    }
+
+    const rank = new Map(initialPortalOrder.map((id, idx) => [id, idx]));
+    return currentCards.sort(
+      (a, b) => (rank.get(a.id) ?? Infinity) - (rank.get(b.id) ?? Infinity)
+    );
+  }
 
   function insertCardInOrder(container, el, orderedIds, trailingEl = null) {
     const targetIdx = orderedIds.indexOf(el.id);
@@ -320,7 +340,7 @@
   function renderFullLayout(settings) {
     dragController?.cancel();
 
-    const portalCards = [...document.querySelectorAll(CONSTANTS.SELECTOR.SERVICE_CARDS)];
+    const portalCards = getPortalCardsInInitialOrder();
     if (mainRow && portalCards.length > 0) {
       if (!cardTemplate) cardTemplate = CustomCards.createCardTemplate(portalCards[0]);
       if (!Array.isArray(settings.customCards)) settings.customCards = [];
@@ -509,6 +529,10 @@
       const hasToggleTarget = TOGGLE_CONFIG.some((cfg) => cfg.find());
       if (!mainRow && !hasToggleTarget) {
         return;
+      }
+
+      if (mainRow) {
+        getPortalCardsInInitialOrder();
       }
 
       const settings = await Storage.loadSettings();
