@@ -167,6 +167,18 @@ test("portal/content.js applies pre-paint hints, initializes lazily without edit
   assert.ok(!document.body.classList.contains(CONSTANTS.CLASSES.EDIT_MODE));
   assert.equal(syncStore.get(CONSTANTS.STORAGE_KEY).hideNavbar, false);
   assert.equal(document.querySelector("nav.navbar").style.display, "");
+  assert.deepEqual(
+    document
+      .querySelector(CONSTANTS.SELECTOR.SERVICE_ROW)
+      .children.filter((el) => el.classList.contains(CONSTANTS.CLASSES.SERVICE_CARD))
+      .map((el) => el.id),
+    ["div-1", "div-2", "div-3"]
+  );
+  assert.deepEqual(Array.from(syncStore.get(CONSTANTS.STORAGE_KEY).order), [
+    "div-1",
+    "div-2",
+    "div-3",
+  ]);
 });
 
 test("portal/content.js handles custom card add/edit/delete, M365 modal, notice ack/unack, and toggle updates incrementally", async () => {
@@ -538,4 +550,80 @@ test("M365 modal switches cleanly to Outlook (domain_hint) from default, onedriv
   assert.equal(syncStore.get(CONSTANTS.STORAGE_KEY).m365RedirectUrl, "https://outlook.cloud.microsoft/mail/");
   assert.equal(syncStore.get(CONSTANTS.STORAGE_KEY).m365RedirectMethod, "domain_hint");
   assert.equal(m365Card.querySelector(".bp-btn-link").title, "現在の設定: Outlook（新方式）");
+});
+
+test("Reset restores default portal card order even when cards were reordered and hidden", async () => {
+  const env = createPortalTestEnv({
+    syncInitial: {
+      betterPortalSettings: {
+        customCards: [
+          {
+            id: "c1",
+            title: "Custom",
+            url: "https://example.com/",
+            iconType: "default",
+            iconValue: "",
+          },
+        ],
+        order: ["div-3", "bp-custom-c1", "div-1", "div-2"],
+        hiddenIds: ["div-1", "bp-custom-c1"],
+      },
+    },
+    includeMain: true,
+    setupDom: buildMockPortalDom,
+  });
+
+  await new Promise((r) => setTimeout(r, 15));
+
+  const { document, syncStore, BP } = env;
+  const { CONSTANTS } = BP;
+  const mainRow = document.querySelector(CONSTANTS.SELECTOR.SERVICE_ROW);
+
+  // Before reset: div-3 and div-2 are visible; div-1 and custom card are in hidden section
+  assert.deepEqual(
+    mainRow.children
+      .filter((el) => el.classList.contains(CONSTANTS.CLASSES.SERVICE_CARD))
+      .map((el) => el.id),
+    ["div-3", "div-2"]
+  );
+  assert.equal(document.querySelector(".bp-hidden-count")?.textContent, "2");
+
+  // Reorder and hide another card in edit mode, then reset
+  document.querySelector(".bp-settings-btn").click();
+  document.querySelector("#div-2 .bp-btn-up").click();
+  document.querySelector("#div-3 .bp-btn-hide").click();
+  assert.deepEqual(
+    mainRow.children
+      .filter((el) => el.classList.contains(CONSTANTS.CLASSES.SERVICE_CARD))
+      .map((el) => el.id),
+    ["div-2"]
+  );
+
+  document.querySelector(".bp-reset-btn").click();
+  const confirmForm = document.querySelector(".bp-modal-form");
+  assert.ok(confirmForm);
+  confirmForm.dispatchEvent({ type: "submit", preventDefault() {} });
+
+  await new Promise((r) => setTimeout(r, 15));
+
+  assert.equal(document.querySelector(".bp-hidden-section"), null);
+  assert.deepEqual(
+    mainRow.children
+      .filter((el) => el.classList.contains(CONSTANTS.CLASSES.SERVICE_CARD))
+      .map((el) => el.id),
+    ["div-1", "div-2", "div-3", "bp-custom-c1"]
+  );
+  for (const id of ["div-1", "div-2", "div-3", "bp-custom-c1"]) {
+    assert.equal(
+      document.getElementById(id).classList.contains(CONSTANTS.CLASSES.HIDDEN_ITEM),
+      false
+    );
+  }
+  assert.deepEqual(Array.from(syncStore.get(CONSTANTS.STORAGE_KEY).order), [
+    "div-1",
+    "div-2",
+    "div-3",
+    "bp-custom-c1",
+  ]);
+  assert.deepEqual(Array.from(syncStore.get(CONSTANTS.STORAGE_KEY).hiddenIds), []);
 });
